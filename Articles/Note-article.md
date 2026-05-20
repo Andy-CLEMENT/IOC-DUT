@@ -100,3 +100,34 @@ L'importance cruciale de la hauteur : L'étude a prouvé qu'à 25 mètres de hau
 
 - **En résumé**
 Cet article prouve qu'il est tout à fait possible de déployer des réseaux de capteurs (IoT) performants dans les endroits les plus hostiles et inaccessibles de la planète pour protéger l'environnement. Mais pour que cela fonctionne, les ingénieurs ne peuvent plus se fier aux vieux manuels : ils doivent absolument coupler des antennes très hautes avec des prédictions basées sur l'Intelligence Artificielle.
+
+## Wireless Transmissions, Propagation and Channel Modelling for IoT Technologies: Applications and Challenges (2022)
+
+Cet article fais l'inventaire des différentes ondes et leur comportement dans certain milieu
+
+- **1. Le contexte : Le "Far West" de l'Internet des Objets (IoT)**
+Aujourd'hui, l'IoT est partout : montres connectées, capteurs agricoles, compteurs d'eau intelligents, usines automatisées (Smart Cities, e-Health, Industry 4.0).
+Pour faire communiquer tous ces objets, il existe une multitude de technologies différentes : certaines à très courte portée (Bluetooth, Zigbee, Wi-Fi) et d'autres à très longue portée (LoRa, Sigfox, NB-IoT).
+Le problème : Un ingénieur qui veut déployer un réseau cellulaire classique (4G/5G) sait comment faire. Mais pour l'IoT, les scénarios sont tellement variés et extrêmes qu'il n'existait pas de manuel unique expliquant comment les ondes radio se comportent pour chaque technologie et chaque milieu. Cet article a été écrit pour combler ce vide.
+
+- **2. Le casse-tête spécifique des capteurs IoT**
+L'article met en évidence pourquoi on ne peut pas simplement réutiliser les équations mathématiques des réseaux mobiles classiques (les téléphones) pour l'IoT. L'IoT impose des défis physiques uniques :
+La position des antennes : Contrairement à un smartphone situé à 1,50 m du sol, un capteur IoT peut être enterré sous terre (agriculture), collé sur un tuyau en métal dans une cave (compteur d'eau), ou même implanté à l'intérieur du corps humain (pacemaker connecté). Ces positions inhabituelles détruisent les ondes radio de manière très spécifique.
+La taille et l'énergie : Les capteurs IoT sont minuscules et fonctionnent sur pile pendant 10 ans. Leurs petites antennes ont une puissance d'émission extrêmement faible, ce qui rend le signal très vulnérable aux obstacles.
+
+- **3. Le cœur de l'article : Un catalogue géant des modèles de propagation**
+Les auteurs ont épluché des centaines de publications scientifiques pour dresser un inventaire complet. Ils ont classé la façon dont les ondes se propagent selon la distance :
+
+Les réseaux corporels (WBAN - Wireless Body Area Networks) : Comment modéliser un signal qui doit traverser la peau, le gras et les muscles sans être totalement absorbé (cas des applications médicales).
+
+Les réseaux locaux et personnels (WLAN / WPAN) : Comment les ondes (comme le Wi-Fi ou le Bluetooth) rebondissent à l'intérieur des maisons intelligentes (Smart Homes) sur les murs, les meubles et les personnes en mouvement.
+
+Les réseaux longue portée (LPWAN) : L'article détaille les modèles mathématiques pour les technologies comme LoRa ou NB-IoT, qui doivent couvrir des villes entières ou de vastes zones rurales, en analysant l'impact de la météo, des bâtiments et du relief.
+
+4. Quel est l'intérêt d'un tel article ?
+Pour comprendre l'utilité de ce type de publication, imaginez-le comme la carte d'état-major de l'ingénierie des télécoms.
+Il explique les avantages et les défauts de chaque grande famille de modèles (les modèles empiriques basés sur l'observation, les modèles déterministes basés sur la géométrie 3D, et les modèles stochastiques basés sur les probabilités).
+Il souligne également les défis de demain : comment assurer la sécurité du signal IoT, comment gérer les interférences quand des milliards d'objets parleront en même temps, et comment localiser un objet avec précision sans utiliser de GPS (trop gourmand en batterie).
+
+En résumé
+Alors que les articles 1 à 5 sont les "outils" (ils inventent de nouveaux marteaux ou tournevis à l'aide de l'Intelligence Artificielle), ce 6ème article est la "boîte à outils théorique". C'est le point de départ incontournable : tout chercheur ou ingénieur qui souhaite créer une Intelligence Artificielle pour optimiser un réseau IoT (comme l'ont fait les auteurs de l'article 5 au Lac Chini) commence par lire ce genre de synthèse pour comprendre la physique des ondes qu'il va manipuler.
