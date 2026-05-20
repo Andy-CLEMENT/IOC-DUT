@@ -155,3 +155,14 @@ Alors que les articles 1 à 5 sont les "outils" (ils inventent de nouveaux marte
 Limites (Le "Research Gap" pour justifier ton projet) :
 La revue souligne qu'il existe encore d'énormes lacunes dans la modélisation des canaux pour LoRa : la majorité des études se contentent d'utiliser des modèles trop simples (comme LNSPL) ou se limitent à des environnements urbains basiques sans tenir compte des conditions réelles complexes. Surtout, les auteurs concluent que l'avenir réside dans le développement de techniques de prédiction hybrides combinant le Machine Learning avec des données réelles, mais que ce domaine en est encore à ses balbutiements.
 Pour ton article : C'est l'argument ultime pour introduire la section "Proposed Method". Tu peux écrire : « De récentes revues de littérature exhaustives ont souligné l'imprécision des modèles mathématiques classiques pour estimer le signal (RSSI) et la localisation dans les réseaux LoRa, appelant fermement à l'intégration de méthodes basées sur le Machine Learning. Notre étude répond directement à ce besoin (Research Gap) en proposant un modèle Random Forest basé sur la multilatération (MTL) du RSSI. Contrairement aux approches limitées au Cloud, notre système embarque cette intelligence artificelle directement sur un nœud Edge (Jetson Nano), alliant ainsi précision algorithmique et autonomie matérielle. »
+
+## Idée a prendre
+
+Dans l'article 6 nous parlons de smart City et de l'automatisation de certain domaine. Ici on prend l'exemple de l'extinction de l'éclairage urbain enfin d'enssoleillement visant ainsi à réduire les émissions.
+l'IoT peut être assimilé à Emergency IoT (EIoT) donc detecteur d'alarme.
+Les dispositifs IoT disposent d'une faible capacité d'alimentation, souvant sur batterie.
+
+On peut accéder à la localisation des appareils avec the position can be obtained using Global Navigation Satellite Systems (GNSS), such as the Global Positioning System (GPS), si cela en sont pourvu. Pas fiable dans environnement indoor. C'est un challenge an IoT. On peut sa'ppuyer sur des élément comme la phase ou l'angle d'arrivé de l'onde
+
+Les canaux sans fils doivent être bien choi car le moindre relief peut affaiblir le sognal et le rendre indetectable.
+Le model d'okomura hata ne prend pas en compte les reliefs
