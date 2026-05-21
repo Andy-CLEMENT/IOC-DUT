@@ -25,7 +25,7 @@ Précision : Le modèle a atteint une erreur quadratique moyenne (RMSE) de seule
 
 Le point fort (Généralisation) : La plus grande victoire de cette étude réside dans ses tests sur des "zones d'exclusion". Les chercheurs ont demandé au modèle de prédire la couverture dans des quartiers où absolument aucune mesure n'avait été fournie lors de l'entraînement. Grâce à sa compréhension de l'image satellite, l'IA a été capable de déduire que derrière tel type de bâtiment, le signal allait logiquement chuter, prouvant qu'elle avait réellement appris la physique de la propagation radio et non pas juste mémorisé les données.
 
-Limites (Le "Research Gap" pour justifier ton projet) :
+- **Limites (Le "Research Gap" pour justifier ton projet) :**
 La complexité de cette méthode est très élevée (nécessite des images satellites, du traitement d'image lourd, des modèles de Deep Learning très gourmands en ressources). Elle est difficilement applicable telle quelle dans un contexte de déploiement IoT LoRa, où les nœuds sont limités en puissance et où on cherche une solution "on-the-fly".
 Pour ton article : Cet article est excellent pour montrer que tu connais les tendances actuelles de la recherche. Tu peux l'utiliser pour dire : « Alors que les tendances actuelles en prédiction de couverture s'orientent vers des modèles multi-modaux complexes nécessitant une puissance de calcul importante (Deep Learning sur images satellites), notre approche propose une alternative plus pragmatique et autonome pour l'IoT. En couplant la multilatération (MTL) et le Random Forest, nous atteignons une précision élevée tout en maintenant une efficacité énergétique et matérielle compatible avec un déploiement sur une plateforme Edge (Jetson Nano), rendant la localisation intelligente accessible sans avoir besoin d'infrastructures cloud lourdes ou d'imagerie complexe. »
 
@@ -45,7 +45,7 @@ Pour contourner cette limite de puissance de calcul, les chercheurs ont appliqu�
 - **4. Expérimentations et résultats sur le réseau LTE**
 L'algorithme a été rigoureusement évalué en utilisant à la fois des mesures simulées par ordinateur et de véritables mesures de terrain issues d'un réseau 4G LTE.  Les expériences démontrent que le FRK offre un excellent compromis entre la précision des prédictions de signal et le niveau de complexité informatique requis.  Enfin, pour se rapprocher de la réalité opérationnelle des réseaux, les chercheurs ont validé leur solution sur un scénario plus complexe impliquant de multiples cellules (Multicellular use-case) dotées d'antennes directives. Dans cette configuration, le modèle FRK a démontré de très bonnes performances non seulement pour prédire la carte globale de couverture, mais aussi pour identifier avec précision la meilleure cellule serveuse ("best serving cell") pour un point géographique donné.
 
-Limites (Le "Research Gap" pour justifier ton projet) :
+- **Limites (Le "Research Gap" pour justifier ton projet) :**
 L'étude se concentre exclusivement sur les réseaux cellulaires LTE, qui sont très différents des réseaux IoT. Bien que le FRK réduise la complexité par rapport au Krigeage classique, cela reste une méthode mathématique lourde conçue pour de grandes quantités de données cellulaires centralisées.
 Pour ton article : Cela te permet de justifier que pour des réseaux de capteurs sans fil (WSN) basse consommation comme LoRa, il faut une approche encore plus frugale en énergie et en calcul. Votre utilisation de la multilatération (MTL) combinée à un algorithme de Machine Learning (Random Forest) exécuté localement sur une Jetson Nano (Edge Computing) est beaucoup plus adaptée aux contraintes matérielles de l'IoT que les méthodes géostatistiques lourdes.
 
@@ -66,13 +66,13 @@ Sélection des données (Les 7 caractéristiques) : Pour prédire le signal, l'a
 - **4. Les résultats obtenus**
 L'algorithme a été testé sur des bases de données réelles massives.Précision mathématique : Il a atteint un $R^2$ (coefficient de détermination) de 0,93 (ce qui signifie que le modèle explique 93% des variations du signal, un score excellent) et une marge d'erreur moyenne (RMSE) de seulement 2,65 dB. En comparaison, les modèles empiriques classiques font souvent des erreurs de 7 à 10 dB.Impact pour les opérateurs : En utilisant MLOE, un opérateur peut planifier le déploiement de ses antennes 5G ou de ses capteurs IoT de manière beaucoup plus fine. Cela évite les "zones blanches" imprévues et empêche la sur-installation coûteuse et inutile d'antennes (optimisation des coûts de déploiement et d'énergie).
 
-Limites (Le "Research Gap" pour justifier ton projet) :
+- **Limites (Le "Research Gap" pour justifier ton projet) :**
 Cette étude est très performante, mais elle est conçue pour des infrastructures lourdes (réseaux 4G/5G cellulaires) où l'énergie et la puissance de calcul ne sont pas un problème. Le modèle tourne sur un serveur distant (Cloud/Web App).
 Pour ton article : Tu peux souligner que pour des réseaux IoT (comme LoRaWAN), il est impossible d'appliquer des méthodes nécessitant une telle infrastructure ou des serveurs distants en permanence. Ton projet se démarque car il utilise le Machine Learning (également Random Forest) mais appliqué aux signaux RSSI de réseaux LoRa basse consommation, et surtout, l'intelligence artificielle est exécutée localement (Edge Computing) sur un micro-ordinateur embarqué (Jetson Nano) plutôt que sur un gros serveur cloud. Cela répond directement aux contraintes de connectivité et d'énergie des réseaux de capteurs (WSN).
 
 ## Mobile Network Coverage Prediction Based on Supervised Machine Learning Algorithms (2022)
 
-Ici on compare les différents modèles d'IA qui permetten d'estimer la couverture réseau et de créer alors un nouveau réseau. On compare plusieurs modèle mais la conclusion est qu'il 
+Ici on compare les différents modèles d'IA qui permettent d'estimer la couverture réseau et de créer alors un nouveau réseau. On compare plusieurs modèle mais la conclusion est qu'il faut s'appuyer sur l'IA pour être performant.
 
 - **1. Le contexte et le problème à résoudre**
 Depuis quelques années, l'utilisation de l'Apprentissage Automatique (Machine Learning - ML) pour prédire la couverture réseau est devenue très populaire.Le problème : Il existe des dizaines d'algorithmes de ML différents. Un ingénieur télécom qui souhaite moderniser son réseau se retrouve face à une "jungle" de modèles d'IA sans savoir lequel choisir. Faut-il utiliser un réseau de neurones complexes ? Une simple régression ?L'objectif de cet article est donc de faire un grand "benchmark" (un test comparatif rigoureux) pour évaluer quel algorithme est le plus adapté pour prédire la perte de signal entre deux antennes terrestres (ce qu'on appelle les communications Ground-to-Ground ou G2G).
@@ -82,13 +82,14 @@ Les chercheurs ont rassemblé un grand jeu de données contenant des mesures de 
 
 - **3. Les critères d'évaluation**
 Pour déterminer le gagnant, les auteurs n'ont pas seulement regardé la précision. Ils ont utilisé une double évaluation, indispensable dans le monde industriel :La précision statistique : L'algorithme se trompe-t-il de beaucoup de décibels (dB) ? (Mesuré via l'erreur RMSE et le score $R^2$).L'efficacité temporelle (La vitesse) : Combien de temps l'algorithme met-il à "apprendre" (temps d'entraînement) et combien de temps met-il à calculer une nouvelle prédiction ?
+
 - **4. Les résultats : La nuance entre Théorie et Pratique**
 C'est ici que l'article devient très intéressant, car il révèle un vrai dilemme d'ingénieur :Le grand gagnant théorique (La précision pure) : L'algorithme GPR (Processus Gaussien) remporte la palme de la précision mathématique. Il fait le moins d'erreurs. Cependant, il est extrêmement lourd et lent. Sur un réseau réel où il faut calculer des millions de points, il prendrait beaucoup trop de temps et consommerait trop de ressources informatiques.Le grand gagnant pratique (Le choix recommandé) : La famille des Ensembles d'Arbres (ET) (qui inclut la Forêt Aléatoire). Cet algorithme offre une précision presque identique au GPR (l'écart d'erreur est négligeable), mais il est infiniment plus rapide à s'entraîner et à générer des prédictions.
 
 - **En résumé**
 Cet article est un guide d'aide à la décision. Sa conclusion forte pour l'industrie est la suivante : « Ne vous laissez pas aveugler par la perfection mathématique des Processus Gaussiens ou la complexité des Réseaux de Neurones. Pour planifier un réseau mobile de manière rapide, précise et sur plusieurs fréquences différentes, la méthode des Ensembles d'Arbres (ET / Random Forest) est le meilleur outil à déployer. »(C'est d'ailleurs exactement la conclusion que les auteurs du 3ème article ont appliquée en choisissant la Forêt Aléatoire pour leur outil en ligne !).
 
-Limites (Le "Research Gap" pour justifier ton projet) :
+- **Limites (Le "Research Gap" pour justifier ton projet) :**
 L'étude reste purement axée sur les réseaux cellulaires haut débit (4G/LTE), qui bénéficient d'infrastructures lourdes et n'ont pas de réelles contraintes énergétiques pour collecter et traiter la donnée.
 Pour ton article : Ce papier est une pépite pour toi ! Il te permet de justifier scientifiquement ton propre choix d'algorithme. Tu pourras argumenter ainsi dans ta section : "Des études comparatives exhaustives ont prouvé que le Random Forest offre le meilleur compromis entre vitesse et précision pour la prédiction de couverture. Toutefois, ces recherches se limitent aux réseaux cellulaires classiques. Notre projet comble cette lacune en transposant l'efficacité du Random Forest à la localisation et la prédiction dans des réseaux IoT très basse consommation (LoRa) via la mesure du RSSI. Surtout, nous prouvons que cette IA peut s'exécuter localement sur du matériel à ressources très limitées (Jetson Nano) grâce au Edge Computing."
 
@@ -105,7 +106,7 @@ Pour comprendre comment le signal se comporte réellement dans ces conditions ex
 Au lieu des habituels "Drive-tests" (en voiture), ils ont inventé le "Boat Drive-test" : ils ont placé des capteurs LoRa sur des bateaux naviguant sur le lac, tout en effectuant des mesures à pied à travers l'épaisse forêt tropicale environnante.
 Ils ont également voulu tester l'impact de l'infrastructure en plaçant l'antenne de réception (la "Gateway") à deux hauteurs très différentes : 25 mètres (juste au niveau de la cime des arbres) et 120 mètres (sur un grand pylône télécom dominant la canopée).
 
- - **3. L'intelligence artificielle "Hybride" à la rescousse**
+- **3. L'intelligence artificielle "Hybride" à la rescousse**
 Pour donner un sens à ces données très complexes (où le signal fluctue énormément à cause des arbres et des reflets de l'eau), ils ont utilisé le Machine Learning Hybride.
 Plutôt que de choisir entre un modèle physique classique ou un modèle d'IA pur (comme vu dans les articles précédents), l'approche hybride combine les deux.
 L'algorithme prend en compte les lois de la physique de base, mais utilise l'Intelligence Artificielle pour "apprendre" et corriger les erreurs causées spécifiquement par l'absorption des feuilles, les collines et l'évaporation de l'eau.
@@ -117,7 +118,7 @@ L'importance cruciale de la hauteur : L'étude a prouvé qu'à 25 mètres de hau
 - **En résumé**
 Cet article prouve qu'il est tout à fait possible de déployer des réseaux de capteurs (IoT) performants dans les endroits les plus hostiles et inaccessibles de la planète pour protéger l'environnement. Mais pour que cela fonctionne, les ingénieurs ne peuvent plus se fier aux vieux manuels : ils doivent absolument coupler des antennes très hautes avec des prédictions basées sur l'Intelligence Artificielle.
 
-Limites (Le "Research Gap" pour justifier ton projet) :
+- **Limites (Le "Research Gap" pour justifier ton projet) :**
 Bien que cette étude soit très avancée, elle se limite exclusivement à la prédiction de l'atténuation du signal (Path Loss) pour estimer la couverture du réseau. L'objectif n'est pas de localiser physiquement un capteur (trouver ses coordonnées X, Y). De plus, ces modèles complexes sont conçus pour de la planification de réseau hors-ligne.
 Pour ton article : Ce papier est ton arme secrète pour justifier tes choix techniques. Tu peux écrire : « De très récentes recherches (Alobaidy et al., 2024) ont incontestablement prouvé que les algorithmes basés sur les arbres (Random Forest) sont les plus performants pour modéliser les fluctuations complexes du signal LoRa (RSSI) face aux obstacles, offrant le meilleur équilibre entre précision et vitesse de calcul, et surpassant même les réseaux de neurones. Notre projet s'appuie sur cette validation scientifique du Random Forest pour franchir l'étape suivante : nous ne l'utilisons plus seulement pour prédire théoriquement la couverture, mais nous le couplons à la multilatération (MTL) pour accomplir une localisation active. De plus, notre implémentation sur une Jetson Nano prouve qu'une telle intelligence prédictive peut être déployée de manière autonome et frugale sur un nœud Edge (Edge Computing), comblant ainsi le besoin en localisation temps-réel de l'IoT. »
 
@@ -144,25 +145,46 @@ Les réseaux locaux et personnels (WLAN / WPAN) : Comment les ondes (comme le Wi
 
 Les réseaux longue portée (LPWAN) : L'article détaille les modèles mathématiques pour les technologies comme LoRa ou NB-IoT, qui doivent couvrir des villes entières ou de vastes zones rurales, en analysant l'impact de la météo, des bâtiments et du relief.
 
-4. Quel est l'intérêt d'un tel article ?
+- **4. Quel est l'intérêt d'un tel article ?**
 Pour comprendre l'utilité de ce type de publication, imaginez-le comme la carte d'état-major de l'ingénierie des télécoms.
 Il explique les avantages et les défauts de chaque grande famille de modèles (les modèles empiriques basés sur l'observation, les modèles déterministes basés sur la géométrie 3D, et les modèles stochastiques basés sur les probabilités).
 Il souligne également les défis de demain : comment assurer la sécurité du signal IoT, comment gérer les interférences quand des milliards d'objets parleront en même temps, et comment localiser un objet avec précision sans utiliser de GPS (trop gourmand en batterie).
 
-En résumé
+- **En résumé**
 Alors que les articles 1 à 5 sont les "outils" (ils inventent de nouveaux marteaux ou tournevis à l'aide de l'Intelligence Artificielle), ce 6ème article est la "boîte à outils théorique". C'est le point de départ incontournable : tout chercheur ou ingénieur qui souhaite créer une Intelligence Artificielle pour optimiser un réseau IoT (comme l'ont fait les auteurs de l'article 5 au Lac Chini) commence par lire ce genre de synthèse pour comprendre la physique des ondes qu'il va manipuler.
 
-Limites (Le "Research Gap" pour justifier ton projet) :
+- **Limites (Le "Research Gap" pour justifier ton projet) :**
 La revue souligne qu'il existe encore d'énormes lacunes dans la modélisation des canaux pour LoRa : la majorité des études se contentent d'utiliser des modèles trop simples (comme LNSPL) ou se limitent à des environnements urbains basiques sans tenir compte des conditions réelles complexes. Surtout, les auteurs concluent que l'avenir réside dans le développement de techniques de prédiction hybrides combinant le Machine Learning avec des données réelles, mais que ce domaine en est encore à ses balbutiements.
 Pour ton article : C'est l'argument ultime pour introduire la section "Proposed Method". Tu peux écrire : « De récentes revues de littérature exhaustives ont souligné l'imprécision des modèles mathématiques classiques pour estimer le signal (RSSI) et la localisation dans les réseaux LoRa, appelant fermement à l'intégration de méthodes basées sur le Machine Learning. Notre étude répond directement à ce besoin (Research Gap) en proposant un modèle Random Forest basé sur la multilatération (MTL) du RSSI. Contrairement aux approches limitées au Cloud, notre système embarque cette intelligence artificelle directement sur un nœud Edge (Jetson Nano), alliant ainsi précision algorithmique et autonomie matérielle. »
 
 ## Idée a prendre
 
-Dans l'article 6 nous parlons de smart City et de l'automatisation de certain domaine. Ici on prend l'exemple de l'extinction de l'éclairage urbain enfin d'enssoleillement visant ainsi à réduire les émissions.
-l'IoT peut être assimilé à Emergency IoT (EIoT) donc detecteur d'alarme.
+### Article 6
+Dans l'article 6 nous parlons de smart City et de l'automatisation de certain domaine. Ici on prend l'exemple de l'extinction de l'éclairage urbain en fin d'enssoleillement visant ainsi à réduire les émissions.
+l'IoT peut être assimilé à Emergency IoT (EIoT) donc detecteur d'alarme. Il existe plusieurs fonction comme le suivi des animaux ou encore les capteurs de santé et le domaine indutriel.
 Les dispositifs IoT disposent d'une faible capacité d'alimentation, souvant sur batterie.
 
-On peut accéder à la localisation des appareils avec the position can be obtained using Global Navigation Satellite Systems (GNSS), such as the Global Positioning System (GPS), si cela en sont pourvu. Pas fiable dans environnement indoor. C'est un challenge an IoT. On peut sa'ppuyer sur des élément comme la phase ou l'angle d'arrivé de l'onde
+QoS doit être suffisant, plus l'appareil est proche du sol, moins la QoS est bonne.
 
-Les canaux sans fils doivent être bien choi car le moindre relief peut affaiblir le sognal et le rendre indetectable.
-Le model d'okomura hata ne prend pas en compte les reliefs
+On peut accéder à la localisation des appareils avec the position en utilisant le Global Navigation Satellite Systems (GNSS),  mais aussi le Global Positioning System (GPS), si cela en sont pourvu. Pas fiable dans environnement indoor. C'est un challenge en IoT car nous avons rarement ces fonctions sur les dispositifs. On peut s'appuyer sur des éléments comme la phase ou l'angle d'arrivé de l'onde pour localiser les émetteurs.
+
+La sécurité dans les dispositifs IoT n'est pas à prendre à la légére. Ces dispositifs ne peuvent physiquement pas avoir une très grande sécurité, il faut donc le prévoir
+
+Les canaux sans fils doivent être bien choisi car le moindre relief peut affaiblir le signal et le rendre indetectable. Cela affecte la QoS du système. Les bâtiments ou les arbres peuvent vréer des interférecne qui réduise l'efficacité du signal (PL) etengendre parfaois des interference intersymbole (ISI) par effet Doppler par exemple.
+
+On, utilise 3 types de canal:
+
+- Deterministic models : reposes sur les connaissances des caractéristiques physique du canal (basé sur les équations de maxwell)
+Avec cette méthode on accroit la complexité des calcules
+- ray-traycing  
+- non-geometric stochastic model : repose sur des distributions statistiques. On se base sur des mesures réel des canaux or ils  ne prennent pas en compte la diffraction et l'attenuation
+
+Les modèles empirique connus tels que Okumura, Lee ou Stanford University program sont très populaire mais très gourmand en calcules. Ces modèles n'ont été testé qu'avec des antennes courte.
+Le model d'okomura hata (modéle empirique) ne prend pas en compte les reliefs (donc peu performant)
+As a result, the latter two models are commonly utilized in ray-tracing and coverage estimation tools like Cloud-RF and Radio Mobile.
+On doit aussi gérer l'attenuation par feuillage, la densité et le nombre ainsi que la taille des feuilles ont une influence sur l'attenuation, pour compenser on peut élever la taille des antennes. On retrouve le même phénomène dans les lieux clos
+
+Le réseaux 5G reponds aux nombre grandissant de modules IoT
+
+Réseaux de neurones CNN constituen un modele d'apprentissage profond (DP). Images Google Maps 2D on entraîné l'IA.
+La Technologie LoRaWAN est très puissante mais manque de données sur l'utilisation en milieux tropical / relief. On a pas atteint le plein potentiel de la technologie.
