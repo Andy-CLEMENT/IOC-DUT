@@ -10,10 +10,12 @@ Cette puce est basé sur une puce STM32 et permet la communication en LoRaWAN. E
 
 - Bouton poussoir pour reset et reboot (SW1 et SW2)
 - J2-> permet de brancher l'antenne au module pour communication LoRaWAN
-- RT9013 -> Permet de réguler la tension et de toujours avoir 3.3V4
+- RT9013 -> Permet de réguler la tension et de toujours avoir 3.3V.
 - PA10 -> Connecté au transistor Q2 et s'active lorsqu'il y a de la fumée ( On a une légére variation de courant INA+ / INA-)
 - LMV358 utilisé pour amplifie le courant généré par une légère variation de courant. Il sera connecté au port ADC du module pour échantilloné avec le ADC.
 - Connector sont des broches de communications
+- J3 est la broche d'alimentation de la pile AAA, la tension de sortie est VCC. On a une diode D3 de protection du circuit. On utilise un pont diviseur pour ne pas griller le RT9013.
+- Pour le circuit amplificateur, on utilise 2 AOP pour INA et INB et un diviseur de tension  (R8 et R9) pour avoir la tension négative ( on sait que la tension d'entrée est de 0-3.3V). Filtrage passe-bas (C8 et R11) : Le condensateur C8 (100 nF) placé en parallèle avec la résistance R11 (10 kΩ) forme un filtre actif. Son rôle est d'éliminer les parasites à haute fréquence (le bruit électrique, les interférences radio du module LoRaWAN) pour ne laisser passer que les variations très lentes de tension causées par l'accumulation de fumée. OUTB est la sortie clean du circuit, elle est lu par.
 
 ### Button
 
