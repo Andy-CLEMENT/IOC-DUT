@@ -190,3 +190,5 @@ Réseaux de neurones CNN constituen un modele d'apprentissage profond (DP). Imag
 La Technologie LoRaWAN est très puissante mais manque de données sur l'utilisation en milieux tropical / relief. On a pas atteint le plein potentiel de la technologie.
 
 
+
+### 
