@@ -188,3 +188,5 @@ Le réseaux 5G reponds aux nombre grandissant de modules IoT
 
 Réseaux de neurones CNN constituen un modele d'apprentissage profond (DP). Images Google Maps 2D on entraîné l'IA.
 La Technologie LoRaWAN est très puissante mais manque de données sur l'utilisation en milieux tropical / relief. On a pas atteint le plein potentiel de la technologie.
+
+
