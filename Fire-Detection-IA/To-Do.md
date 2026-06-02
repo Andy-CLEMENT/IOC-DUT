@@ -11,6 +11,7 @@
 [Link](https://developer.nvidia.com/embedded/jetpack) to the Constructor Website
 
 - Configure and Install The Software with Balena Etcher
+We use the JetPack 6.2.1 for the configuration according to this [web-site](https://developer.nvidia.com/embedded/jetpack-archive). To have a healthy installation, we have to chek if the firmware is above 36. (we have 36.4.3)
 
 ## Material to Have
 
