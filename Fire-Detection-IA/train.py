@@ -1,18 +1,18 @@
 from ultralytics import YOLO
 
 def main():
-
-    model = YOLO("yolov8s.pt") #YOLOv8 small
+    model = YOLO("weights/yolov8s.pt") #YOLOv8 small
 
     print("Training begins...")
     
     results = model.train(
-        data="Fire-Detection-IA/dataset/data.yaml",
+        data="dataset/data.yaml",
         epochs=50,
         imgsz=640, # image size
         batch=16,
         device=0,
         workers=4, # CPU threads
+        project="runs/detect",
         name="yolov8s_fire_day_IR_model" #save directory
     )
     
