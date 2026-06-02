@@ -1,6 +1,6 @@
 task: detect
 mode: train
-model: runs\detect\runs\detect\yolov8s_fire_day_IR_model-3\weights\last.pt
+model: runs\detect\yolov8s_fire_day_IR_model\weights\last.pt
 data: dataset\data.yaml
 epochs: 50
 time: null
@@ -24,7 +24,7 @@ single_cls: false
 rect: false
 cos_lr: false
 close_mosaic: 10
-resume: runs\detect\runs\detect\yolov8s_fire_day_IR_model-3\weights\last.pt
+resume: runs\detect\yolov8s_fire_day_IR_model\weights\last.pt
 amp: true
 fraction: 1.0
 profile: false
