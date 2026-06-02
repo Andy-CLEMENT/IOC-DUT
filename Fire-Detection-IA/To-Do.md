@@ -1,16 +1,17 @@
-## To-Do
+# To-Do
 
-### Camera
+## Camera
 
 - The camera can be powered by a 12V external power supply. The Ethernet port will be used to share the video stream with the Jetson Orin Nano. We are considering this solution because the Jetson Nano's Ethernet port does not support PoE; it is only programmed for data transfer.
 
 - Configure the camera directly with the Jetson Nano (OS base on Linux).
 
-### Jetson
-[link](https://developer.nvidia.com/embedded/jetpack) to the Constructor Website
+## Jetson
+
+[Link](https://developer.nvidia.com/embedded/jetpack) to the Constructor Website
 
 - Configure and Install The Software with Balena Etcher
-
+We use the JetPack 6.2.1 for the configuration according to this [web-site](https://developer.nvidia.com/embedded/jetpack-archive). To have a healthy installation, we have to chek if the firmware is above 36. (we have 36.4.3)
 
 ## Material to Have
 
