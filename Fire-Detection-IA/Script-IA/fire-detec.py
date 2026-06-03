@@ -66,6 +66,24 @@ while True:
         
     # 3. PRÉDICTION IA ULTRA-RAPIDE (Inférence TensorRT sur le GPU)
     results = model.predict(source=frame, conf=0.4, verbose=False)
+
+    # On vérifie chaque objet détecté par l'IA dans l'image
+    for box in results[0].boxes:
+        # On récupère le niveau de confiance et le type (0 ou 1)
+        confidence = float(box.conf[0])
+        class_id = int(box.cls[0])
+        label = model.names[class_id] # 'fire' ou 'smoke'
+        
+        # Si l'IA est sûre à plus de 60 %
+        if confidence > 0.60:
+            # On crée un message d'alerte structuré
+            alerte = {
+                "capteur": "Camera_Anpviz_1",
+                "type_alerte": label,
+                "confiance": round(confidence * 100, 2)
+            }
+            print(f"!! ALERTE DÉCLENCHÉE : {alerte}")
+            # C'est ici que l'on enverra le JSON sur le réseau !
     
     # 4. RÉCUPÉRATION DE L'IMAGE ANNOTÉE PAR L'IA
     annotated_frame = results[0].plot()
