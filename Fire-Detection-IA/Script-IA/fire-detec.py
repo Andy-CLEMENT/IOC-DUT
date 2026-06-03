@@ -1,11 +1,87 @@
 import cv2
 from ultralytics import YOLO
+#ajout alexis pour communication websocket non bloquante
+import threading
+import queue
+import time
+import json
+from datetime import datetime
+
+try:
+    import websocket
+except Exception:
+    websocket = None
+# fin ajout alexis pour communication websocket non bloquante
 
 # 1. CHARGEMENT DU MODÈLE OPTIMISÉ TENSORRT
 MODEL_PATH = "model_020626.engine"
 print(f"Chargement du modèle TensorRT ({MODEL_PATH}) sur le GPU...")
 model = YOLO(MODEL_PATH)
 print("IA prête et optimisée !")
+
+# ajout alexis pour communication websocket non bloquante --- WebSocket non-bloquant pour envoyer les alertes au dashboard ---
+class WebSocketAlertSender:
+    def __init__(self, url, queue_max=1000, reconnect_delay=5):
+        self.url = url
+        self.queue = queue.Queue(maxsize=queue_max)
+        self.reconnect_delay = reconnect_delay
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def send(self, payload: dict) -> bool:
+        """Queue le payload (dict). Ne bloque pas l'émetteur vidéo.
+        Retourne False si la queue est pleine ou si websocket-client n'est pas disponible.
+        """
+        if websocket is None:
+            return False
+        try:
+            self.queue.put_nowait(json.dumps(payload))
+            return True
+        except queue.Full:
+            return False
+
+    def _run(self):
+        if websocket is None:
+            # bibliothèque absente, on ne tente rien
+            return
+
+        while not self._stop.is_set():
+            ws = None
+            try:
+                ws = websocket.create_connection(self.url, timeout=8)
+                while not self._stop.is_set():
+                    try:
+                        msg = self.queue.get(timeout=0.5)
+                    except queue.Empty:
+                        continue
+                    try:
+                        ws.send(msg)
+                    except Exception:
+                        # échec d'envoi -> remettre le message si possible et reconnecter
+                        try:
+                            self.queue.put_nowait(msg)
+                        except queue.Full:
+                            pass
+                        break
+            except Exception:
+                time.sleep(self.reconnect_delay)
+            finally:
+                try:
+                    if ws:
+                        ws.close()
+                except Exception:
+                    pass
+
+    def close(self, timeout=2.0):
+        self._stop.set()
+        self._thread.join(timeout)
+
+# URL du dashboard (valeur par défaut vue dans le frontend)
+WS_URL = "ws://192.168.4.1/ws"
+ws_sender = WebSocketAlertSender(WS_URL)
+
+#fin ajout alexis pour communication websocket non bloquante
 
 # 2. DEFINITIONS DES PIPELINES GSTREAMER
 def gstreamer_pipeline_h264(user, password, ip, port=554, channel=101):
@@ -83,7 +159,22 @@ while True:
                 "confiance": round(confidence * 100, 2)
             }
             print(f"!! ALERTE DÉCLENCHÉE : {alerte}")
-            # C'est ici que l'on enverra le JSON sur le réseau !
+            #ajout alexis pour communication websocket non bloquante
+            # Envoi non-bloquant vers le dashboard via WebSocket
+            try:
+                # enrichit le message avec un timestamp pour le dashboard
+                payload = dict(alerte)
+                payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                # expose un champ `flame` attendu par le dashboard (true si type_alerte == 'fire')
+                payload["flame"] = True if label.lower() == "fire" else False
+
+                ok = ws_sender.send(payload)
+                if not ok:
+                    # échec d'enqueue (queue pleine ou websocket non disponible)
+                    print("Envoi WS non effectué (queue pleine ou lib manquante)")
+            except Exception as e:
+                print(f"Erreur en préparant l'alerte réseau: {e}")
+                #fin ajout alexis pour communication websocket non bloquante
     
     # 4. RÉCUPÉRATION DE L'IMAGE ANNOTÉE PAR L'IA
     annotated_frame = results[0].plot()
@@ -108,4 +199,9 @@ while True:
 # Libération propre des ressources
 cap.release()
 cv2.destroyAllWindows()
+# Ferme proprement le thread d'envoi WS
+try:
+    ws_sender.close()
+except Exception:
+    pass
 print("Système arrêté proprement.")
