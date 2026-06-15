@@ -11,7 +11,7 @@ def main():
         imgsz=640, # image size
         batch=16,
         device=0,
-        workers=4, # CPU threads
+        workers=4, # cpu threads
         project="runs/detect",
         name="yolov8s_fire_day_IR_model" #save directory
     )
