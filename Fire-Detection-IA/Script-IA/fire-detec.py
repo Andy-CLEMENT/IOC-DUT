@@ -1,6 +1,5 @@
 import cv2
 from ultralytics import YOLO
-#ajout alexis pour communication websocket non bloquante
 import threading
 import queue
 import time
@@ -9,17 +8,24 @@ from datetime import datetime
 
 try:
     import websocket
-except Exception:
+except ImportError:
     websocket = None
-# fin ajout alexis pour communication websocket non bloquante
 
-# 1. CHARGEMENT DU MODÈLE OPTIMISÉ TENSORRT
+# ==========================================
+# CONFIGURATION GLOBALE (Ajuste tes valeurs ici)
+# ==========================================
 MODEL_PATH = "model_020626.engine"
-print(f"Chargement du modèle TensorRT ({MODEL_PATH}) sur le GPU...")
-model = YOLO(MODEL_PATH)
-print("IA prête et optimisée !")
+WS_URL = "ws://127.0.0.1:8765"  # Ca c'est pour le test -> Remettre "ws://192.168.4.1/ws" pour le vrai serveur
+CAMERA_IP = "192.168.0.123"
+USER = "admin"
+PASSWORD = "123456"
+WINDOW_NAME = "Système de Détection Incendie IA - 4MP"
 
-# ajout alexis pour communication websocket non bloquante --- WebSocket non-bloquant pour envoyer les alertes au dashboard ---
+COOLDOWN_SECONDS = 3.0  # Temps d'attente entre deux envois d'alertes réseau
+# ==========================================
+
+
+# --- WebSocket non-bloquant pour envoyer les alertes au dashboard ---
 class WebSocketAlertSender:
     def __init__(self, url, queue_max=1000, reconnect_delay=5):
         self.url = url
@@ -30,9 +36,6 @@ class WebSocketAlertSender:
         self._thread.start()
 
     def send(self, payload: dict) -> bool:
-        """Queue le payload (dict). Ne bloque pas l'émetteur vidéo.
-        Retourne False si la queue est pleine ou si websocket-client n'est pas disponible.
-        """
         if websocket is None:
             return False
         try:
@@ -43,7 +46,6 @@ class WebSocketAlertSender:
 
     def _run(self):
         if websocket is None:
-            # bibliothèque absente, on ne tente rien
             return
 
         while not self._stop.is_set():
@@ -58,7 +60,6 @@ class WebSocketAlertSender:
                     try:
                         ws.send(msg)
                     except Exception:
-                        # échec d'envoi -> remettre le message si possible et reconnecter
                         try:
                             self.queue.put_nowait(msg)
                         except queue.Full:
@@ -77,13 +78,8 @@ class WebSocketAlertSender:
         self._stop.set()
         self._thread.join(timeout)
 
-# URL du dashboard (valeur par défaut vue dans le frontend)
-WS_URL = "ws://192.168.4.1/ws"
-ws_sender = WebSocketAlertSender(WS_URL)
 
-#fin ajout alexis pour communication websocket non bloquante
-
-# 2. DEFINITIONS DES PIPELINES GSTREAMER
+# --- Fonctions GStreamer ---
 def gstreamer_pipeline_h264(user, password, ip, port=554, channel=101):
     return (
         f"rtspsrc location=rtsp://{ip}:{port}/Streaming/Channels/{channel} "
@@ -106,89 +102,79 @@ def gstreamer_pipeline_h265(user, password, ip, port=554, channel=101):
         "appsink drop=true sync=false"
     )
 
-# Configuration de la caméra et de la fenêtre
-WINDOW_NAME = "Système de Détection Incendie IA - 4MP"
-CAMERA_IP = "192.168.0.123"
-USER = "admin"
-PASSWORD = "123456"
+# --- Initialisation du Système ---
+print(f"Chargement du modèle TensorRT ({MODEL_PATH}) sur le GPU...")
+model = YOLO(MODEL_PATH)
+print("IA prête et optimisée !")
 
-# Initialisation du flux vidéo avec tentative H.264
+ws_sender = WebSocketAlertSender(WS_URL)
+last_alert_time = 0.0  # Initialisation du chronomètre d'alerte
+
 print("Tentative de connexion au flux H.264...")
 RTSP_PIPELINE = gstreamer_pipeline_h264(USER, PASSWORD, CAMERA_IP)
 cap = cv2.VideoCapture(RTSP_PIPELINE, cv2.CAP_GSTREAMER)
 
-# Si le H.264 échoue, on bascule automatiquement sur le H.265 (comme dans lecteur_camera.py)
 if not cap.isOpened():
     print("Échec du flux H.264. Tentative de bascule automatique en H.265...")
     RTSP_PIPELINE = gstreamer_pipeline_h265(USER, PASSWORD, CAMERA_IP)
     cap = cv2.VideoCapture(RTSP_PIPELINE, cv2.CAP_GSTREAMER)
 
 if not cap.isOpened():
-    print("Erreur : Impossible d'ouvrir le flux vidéo de la caméra (H.264 et H.265 rejetés).")
+    print("Erreur : Impossible d'ouvrir le flux vidéo de la caméra.")
     exit()
 
-# Création de la fenêtre graphique
 cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 
 print("\nAnalyse vidéo et prédictions IA en cours...")
 print("Appuyez sur 'q' ou fermez la fenêtre (X) pour quitter.")
 
+# --- Boucle Principale ---
 while True:
     ret, frame = cap.read()
     if not ret:
         print("Perte du flux vidéo ou erreur de lecture.")
         break
         
-    # 3. PRÉDICTION IA ULTRA-RAPIDE (Inférence TensorRT sur le GPU)
     results = model.predict(source=frame, conf=0.4, verbose=False)
 
-    # On vérifie chaque objet détecté par l'IA dans l'image
     for box in results[0].boxes:
-        # On récupère le niveau de confiance et le type (0 ou 1)
         confidence = float(box.conf[0])
         class_id = int(box.cls[0])
-        label = model.names[class_id] # 'fire' ou 'smoke'
+        label = model.names[class_id]
         
-        # Si l'IA est sûre à plus de 60 %
-        if confidence > 0.60:
-            # On crée un message d'alerte structuré
+        # Condition d'alerte : Confiance > 60% ET le temps de cooldown est écoulé
+        current_time = time.time()
+        if confidence > 0.60 and (current_time - last_alert_time) > COOLDOWN_SECONDS:
             alerte = {
                 "capteur": "Camera_Anpviz_1",
                 "type_alerte": label,
                 "confiance": round(confidence * 100, 2)
             }
-            print(f"!! ALERTE DÉCLENCHÉE : {alerte}")
-            #ajout alexis pour communication websocket non bloquante
-            # Envoi non-bloquant vers le dashboard via WebSocket
+            print(f"🔥 ALERTE DÉCLENCHÉE : {alerte}")
+            
             try:
-                # enrichit le message avec un timestamp pour le dashboard
                 payload = dict(alerte)
                 payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
-                # expose un champ `flame` attendu par le dashboard (true si type_alerte == 'fire')
                 payload["flame"] = True if label.lower() == "fire" else False
 
                 ok = ws_sender.send(payload)
                 if not ok:
-                    # échec d'enqueue (queue pleine ou websocket non disponible)
-                    print("Envoi WS non effectué (queue pleine ou lib manquante)")
+                    print("⚠️ Envoi WS non effectué (queue pleine ou lib manquante)")
+                else:
+                    # On met à jour le chronomètre seulement si le message est bien parti
+                    last_alert_time = current_time 
             except Exception as e:
                 print(f"Erreur en préparant l'alerte réseau: {e}")
-                #fin ajout alexis pour communication websocket non bloquante
     
-    # 4. RÉCUPÉRATION DE L'IMAGE ANNOTÉE PAR L'IA
     annotated_frame = results[0].plot()
-    
-    # 5. AFFICHAGE DU RÉSULTAT
     cv2.imshow(WINDOW_NAME, annotated_frame)
     
-    # 6. GESTION DE LA FERMETURE ET DES TOUCHES
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
         print("Arrêt demandé via la touche 'q'.")
         break
         
-    # Détection de la croix (X) pour éviter la réouverture de la fenêtre
     try:
         if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
             print("Fenêtre fermée avec la croix (X).")
@@ -196,10 +182,8 @@ while True:
     except cv2.error:
         break
 
-# Libération propre des ressources
 cap.release()
 cv2.destroyAllWindows()
-# Ferme proprement le thread d'envoi WS
 try:
     ws_sender.close()
 except Exception:
