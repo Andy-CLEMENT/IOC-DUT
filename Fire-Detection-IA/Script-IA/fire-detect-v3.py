@@ -171,7 +171,7 @@ while program_running:
             print("⚠️ Perte du flux vidéo en cours de route !")
             ws_sender.send({
                 "Camera": "Camera_Anpviz_1",
-                "camera_status": "offline",
+                "online": False,
                 "error": "Connexion perdue avec la caméra",
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             })
@@ -185,6 +185,7 @@ while program_running:
             ws_sender.send({
                 "Camera": "Camera_Anpviz_1",
                 "flame": False,
+                "smoke": 100,
                 "online": True,
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             })
@@ -208,9 +209,15 @@ while program_running:
                 
                 try:
                     payload = dict(alerte)
-                    payload["camera_status"] = "online"
+                    payload["online"] = True
                     payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
-                    payload["flame"] = True if label.lower() == "fire" else False
+                    
+                    if label.lower() == "fire":
+                        payload["flame"] = True
+                        payload["smoke"] = 100  # Fumée normale
+                    elif label.lower() == "smoke":
+                        payload["flame"] = False
+                        payload["smoke"] = 650  # Fausse fumée extrême pour forcer l'alerte
 
                     ok = ws_sender.send(payload)
                     if not ok:
