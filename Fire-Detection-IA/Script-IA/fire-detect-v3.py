@@ -146,7 +146,7 @@ while program_running:
         # Envoi de l'état d'erreur périodique au dashboard
         ws_sender.send({
             "Camera": "Camera_Anpviz_1",
-            "camera_status": "offline",
+            "online": False,
             "error": "Impossible d'ouvrir le flux vidéo",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         })
@@ -157,7 +157,7 @@ while program_running:
     # On prévient le dashboard que tout est revenu à la normale
     ws_sender.send({
         "Camera": "Camera_Anpviz_1",
-        "camera_status": "online",
+        "online": True,
         "message": "Flux vidéo restauré",
         "timestamp": datetime.utcnow().isoformat() + "Z"
     })
@@ -178,6 +178,17 @@ while program_running:
             cap.release()
             time.sleep(RECONNECT_DELAY)
             break  # On "casse" cette boucle pour retomber dans le Superviseur et tenter une reconnexion
+
+        #envoi du signal "Tout va bien" (Vert) toutes les 5 secondes
+        current_time = time.time()
+        if (current_time - last_alert_time) > 5.0:
+            ws_sender.send({
+                "Camera": "Camera_Anpviz_1",
+                "flame": False,
+                "online": True,
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+            last_alert_time = current_time
             
         results = model.predict(source=frame, conf=0.4, verbose=False)
 
