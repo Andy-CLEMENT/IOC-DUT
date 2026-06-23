@@ -4,6 +4,7 @@ import threading
 import queue
 import time
 import json
+import sys
 from datetime import datetime
 
 try:
@@ -11,23 +12,34 @@ try:
 except ImportError:
     websocket = None
 
-# ==========================================
-# CONFIGURATION GLOBALE (Ajuste tes valeurs ici)
-# ==========================================
-MODEL_PATH = "model_020626.engine"
-WS_URL = "ws://127.0.0.1:8765"  # Ca c'est pour le test -> Remettre "ws://192.168.4.1/ws" pour le vrai serveur
+#Global configuration
+
+# Video Stream settings
+WS_URL = "ws://127.0.0.1:8765"  #  Put "ws://192.168.4.1/ws" for the real test
 CAMERA_IP = "192.168.0.123"
 USER = "admin"
 PASSWORD = "123456"
-WINDOW_NAME = "Système de Détection Incendie IA - 4MP"
+GSTREAMER_PORT = 554
+GSTREAMER_CHANNEL = 101
+WINDOW_NAME = "IA Fire Detection System - 4MP"
 
-COOLDOWN_SECONDS = 3.0  # Temps d'attente entre deux envois d'alertes réseau
-# ==========================================
+# AI Settings
+MODEL_PATH = "model_020626.engine"
+CONFIDENCE_PREDICT = 0.4
+CONFIDENCE_DETECT = 0.6
+SMOKE_LOW = 100
+SMOKE_MEDIUM = 150
+SMOKE_HEAVY = 650
+
+# Code Behavior
+COOLDOWN_SECONDS = 3.0   # Cooldown between 2 alerts
+RECONNECT_DELAY = 5.0    # Cooldown before try another connection with the serveur
+SEND_DELAY = 3.0         # Frenquency of data sending
 
 
-# --- WebSocket non-bloquant pour envoyer les alertes au dashboard ---
+# --- WebSocket
 class WebSocketAlertSender:
-    def __init__(self, url, queue_max=1000, reconnect_delay=5):
+    def __init__(self, url, queue_max=1000, reconnect_delay=RECONNECT_DELAY):
         self.url = url
         self.queue = queue.Queue(maxsize=queue_max)
         self.reconnect_delay = reconnect_delay
@@ -79,8 +91,8 @@ class WebSocketAlertSender:
         self._thread.join(timeout)
 
 
-# --- Fonctions GStreamer ---
-def gstreamer_pipeline_h264(user, password, ip, port=554, channel=101):
+# --- GStreamer Functions ---
+def gstreamer_pipeline_h264(user, password, ip, port=GSTREAMER_PORT, channel=GSTREAMER_CHANNEL):
     return (
         f"rtspsrc location=rtsp://{ip}:{port}/Streaming/Channels/{channel} "
         f"protocols=tcp user-id={user} user-pw={password} latency=200 ! "
@@ -91,7 +103,7 @@ def gstreamer_pipeline_h264(user, password, ip, port=554, channel=101):
         "appsink drop=true sync=false"
     )
 
-def gstreamer_pipeline_h265(user, password, ip, port=554, channel=101):
+def gstreamer_pipeline_h265(user, password, ip, port=GSTREAMER_PORT, channel=GSTREAMER_CHANNEL):
     return (
         f"rtspsrc location=rtsp://{ip}:{port}/Streaming/Channels/{channel} "
         f"protocols=tcp user-id={user} user-pw={password} latency=200 ! "
@@ -102,90 +114,154 @@ def gstreamer_pipeline_h265(user, password, ip, port=554, channel=101):
         "appsink drop=true sync=false"
     )
 
-# --- Initialisation du Système ---
-print(f"Chargement du modèle TensorRT ({MODEL_PATH}) sur le GPU...")
-model = YOLO(MODEL_PATH)
-print("IA prête et optimisée !")
+def connect_camera():
+    print("Attempt connection with H.264...")
+    cap = cv2.VideoCapture(gstreamer_pipeline_h264(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
+    if cap.isOpened():
+        return cap
+        
+    print("H.264 do not work, try H.265...")
+    cap = cv2.VideoCapture(gstreamer_pipeline_h265(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
+    if cap.isOpened():
+        return cap
+        
+    return None
 
+# --- System initialisation ---
+print(f"Loading ({MODEL_PATH}) on  GPU...")
+model = None
+
+try:
+    model = YOLO(MODEL_PATH)
+except Exception as e:
+    print(f"Load of IA meet an issue: {e}")
+    sys.exit(1)
+
+# Check the model
+if model is not None:
+    print("IA ready !")
+
+# WebSocket run
 ws_sender = WebSocketAlertSender(WS_URL)
-last_alert_time = 0.0  # Initialisation du chronomètre d'alerte
-
-print("Tentative de connexion au flux H.264...")
-RTSP_PIPELINE = gstreamer_pipeline_h264(USER, PASSWORD, CAMERA_IP)
-cap = cv2.VideoCapture(RTSP_PIPELINE, cv2.CAP_GSTREAMER)
-
-if not cap.isOpened():
-    print("Échec du flux H.264. Tentative de bascule automatique en H.265...")
-    RTSP_PIPELINE = gstreamer_pipeline_h265(USER, PASSWORD, CAMERA_IP)
-    cap = cv2.VideoCapture(RTSP_PIPELINE, cv2.CAP_GSTREAMER)
-
-if not cap.isOpened():
-    print("Erreur : Impossible d'ouvrir le flux vidéo de la caméra.")
-    exit()
+last_alert_time = 0.0  
+program_running = True
 
 cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 
-print("\nAnalyse vidéo et prédictions IA en cours...")
-print("Appuyez sur 'q' ou fermez la fenêtre (X) pour quitter.")
+print("press 'q' to exit the program")
 
-# --- Boucle Principale ---
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Perte du flux vidéo ou erreur de lecture.")
-        break
-        
-    results = model.predict(source=frame, conf=0.4, verbose=False)
-
-    for box in results[0].boxes:
-        confidence = float(box.conf[0])
-        class_id = int(box.cls[0])
-        label = model.names[class_id]
-        
-        # Condition d'alerte : Confiance > 60% ET le temps de cooldown est écoulé
-        current_time = time.time()
-        if confidence > 0.60 and (current_time - last_alert_time) > COOLDOWN_SECONDS:
-            alerte = {
-                "capteur": "Camera_Anpviz_1",
-                "type_alerte": label,
-                "confiance": round(confidence * 100, 2)
-            }
-            print(f"🔥 ALERTE DÉCLENCHÉE : {alerte}")
-            
-            try:
-                payload = dict(alerte)
-                payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
-                payload["flame"] = True if label.lower() == "fire" else False
-
-                ok = ws_sender.send(payload)
-                if not ok:
-                    print("⚠️ Envoi WS non effectué (queue pleine ou lib manquante)")
-                else:
-                    # On met à jour le chronomètre seulement si le message est bien parti
-                    last_alert_time = current_time 
-            except Exception as e:
-                print(f"Erreur en préparant l'alerte réseau: {e}")
+# Loop of work
+while program_running:
     
-    annotated_frame = results[0].plot()
-    cv2.imshow(WINDOW_NAME, annotated_frame)
+    # Attempt to connect the camera
+    cap = connect_camera()
     
-    key = cv2.waitKey(1) & 0xFF
-    if key == ord('q'):
-        print("Arrêt demandé via la touche 'q'.")
-        break
-        
-    try:
-        if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
-            print("Fenêtre fermée avec la croix (X).")
+    if cap is None or not cap.isOpened():
+        print("Error : connection to the camera impossible, new attempt in few second...")
+        ws_sender.send({
+            "Camera": "Camera_Anpviz_1",
+            "online": False,
+            "error": "Video Stream can't be read",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        })
+        time.sleep(RECONNECT_DELAY)
+        continue  # new tentative
+
+    print("✅ Connexion enable")
+    ws_sender.send({
+        "Camera": "Camera_Anpviz_1",
+        "online": True,
+        "message": "Video Stream enabled",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    })
+
+    # Loop for IA processing
+    while program_running:
+        ret, frame = cap.read()
+        if not ret:
+            print("⚠️ video stream lost !")
+            ws_sender.send({
+                "Camera": "Camera_Anpviz_1",
+                "online": False,
+                "error": "vido lost",
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+            cap.release()
+            time.sleep(RECONNECT_DELAY)
             break
-    except cv2.error:
-        break
+        #Ping signal to stay awake (every 2 sec)
+        current_time = time.time()
+        if (current_time - last_alert_time) > SEND_DELAY:
+            ws_sender.send({
+                "Camera": "Camera_Anpviz_1",
+                "flame": False,
+                "smoke": 100,
+                "online": True,
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            })
+            last_alert_time = current_time
+            
+        results = model.predict(source=frame, conf=CONFIDENCE_PREDICT, verbose=False)
 
-cap.release()
+        for box in results[0].boxes:
+            confidence = float(box.conf[0])
+            class_id = int(box.cls[0])
+            label = model.names[class_id]
+            
+            current_time = time.time()
+            if confidence > CONFIDENCE_DETECT and (current_time - last_alert_time) > COOLDOWN_SECONDS:
+                alerte = {
+                    "Camera": "Camera_Anpviz_1",
+                    "state": label,
+                    "confiance": round(confidence * 100, 2)
+                }
+                print(f"🔥 FIRE ALERTE : {alerte}")
+                
+                try:
+                    payload = dict(alerte)
+                    payload["online"] = True
+                    payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                    
+                    if label.lower() == "fire":
+                        payload["flame"] = True
+                        payload["smoke"] = SMOKE_LOW  # Low Smoke
+                    elif label.lower() == "smoke":
+                        payload["flame"] = False
+                        payload["smoke"] = SMOKE_HEAVY  # Heavy smoke
+                    ok = ws_sender.send(payload)
+                    if not ok:
+                        print("⚠️ Send to ws is not working")
+                    else:
+                        last_alert_time = current_time 
+                except Exception as e:
+                    print(f"ERROR: {e}")
+        
+        annotated_frame = results[0].plot()
+        cv2.imshow(WINDOW_NAME, annotated_frame)
+        
+        # Gestion de la fermeture propre du programme
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            print("'q' pressed, program is stopping.")
+            program_running = False
+            break
+            
+        try:
+            if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
+                print("Windows close with (X).")
+                program_running = False
+                break
+        except cv2.error:
+            program_running = False
+            break
+
+# --- Nettoyage final avant de quitter ---
+if 'cap' in locals() and cap is not None:
+    cap.release()
 cv2.destroyAllWindows()
 try:
     ws_sender.close()
 except Exception:
     pass
-print("Système arrêté proprement.")
+print("Programme stopped")
