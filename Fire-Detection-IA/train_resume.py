@@ -1,15 +1,13 @@
 from ultralytics import YOLO
 
 def main():
-    model = YOLO("runs/detect/yolov8s_fire_day_IR_model/weights/last.pt") #YOLOv8 small
+    model = YOLO("runs\\detect\\runs\\detect\\yolo11m_fire_ultimate\\weights\\last.pt") 
 
-    print("Resuming training...")
+    print("🔄 Reprise de l'entraînement là où il s'est arrêté...")
     
-    results = model.train(
-        resume=True
-    )
+    results = model.train(resume=True)
     
-    print("Training completed !!!")
+    print("✅ Entraînement terminé !!!")
 
 if __name__ == '__main__':
     main()
