@@ -18,9 +18,9 @@ SERVEUR_PID=$!
 
 sleep 2
 
-echo "Lancement de l'IA (fire-detec.py)..."
+echo "Lancement de l'IA (fire-detect.py)..."
 echo "Appuyez sur 'q' dans la fenêtre vidéo pour quitter."
-python3 fire-detec.py
+python3 fire-detect.py
 
 echo "Arrêt en cours..."
 kill $SERVEUR_PID > /dev/null 2>&1

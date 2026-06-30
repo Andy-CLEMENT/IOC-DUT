@@ -21,7 +21,7 @@ USER = "admin"
 PASSWORD = "123456"
 GSTREAMER_PORT = 554
 GSTREAMER_CHANNEL = 101
-WINDOW_NAME = "Système de Détection Incendie IA - 4MP"
+WINDOW_NAME = "IA Fire Detection System - 4MP"
 
 # AI Settings
 MODEL_PATH = "model_020626.engine"
@@ -162,7 +162,7 @@ while program_running:
         ws_sender.send({
             "Camera": "Camera_Anpviz_1",
             "online": False,
-            "error": "Impossible d'ouvrir le flux vidéo",
+            "error": "Video Stream can't be read",
             "timestamp": datetime.utcnow().isoformat() + "Z"
         })
         time.sleep(RECONNECT_DELAY)
@@ -172,7 +172,7 @@ while program_running:
     ws_sender.send({
         "Camera": "Camera_Anpviz_1",
         "online": True,
-        "message": "Flux vidéo restauré",
+        "message": "Video Stream enabled",
         "timestamp": datetime.utcnow().isoformat() + "Z"
     })
 
@@ -184,7 +184,7 @@ while program_running:
             ws_sender.send({
                 "Camera": "Camera_Anpviz_1",
                 "online": False,
-                "error": "vido lost",
+                "message": "video lost",
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             })
             cap.release()
@@ -216,7 +216,7 @@ while program_running:
                     "state": label,
                     "confiance": round(confidence * 100, 2)
                 }
-                print(f"🔥 ALERTE DÉCLENCHÉE : {alerte}")
+                print(f"🔥 FIRE ALERTE : {alerte}")
                 
                 try:
                     payload = dict(alerte)
