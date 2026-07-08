@@ -6,7 +6,7 @@ def main():
     print("Chargement de l'IA...")
     model = YOLO(model_path)
 
-    dossier_test = "test_after_training"
+    dossier_test = r"C:\Users\Alexis\Desktop\projet\IOC-DUT\Fire-Detection-IA\test_after_training"
 
     print(f"Début de la boucle d'analyse sur le dossier : {dossier_test}")
     
