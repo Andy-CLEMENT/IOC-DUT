@@ -24,18 +24,20 @@ GSTREAMER_CHANNEL = 101
 WINDOW_NAME = "IA Fire Detection System - 4MP"
 
 # AI Settings
-MODEL_PATH = "model_020626.engine"
+MODEL_PATH = "fire-detect-model.engine"
 CONFIDENCE_PREDICT = 0.4
-CONFIDENCE_DETECT = 0.6
+CONFIDENCE_DETECT = 0.5
 SMOKE_LOW = 100
 SMOKE_MEDIUM = 150
 SMOKE_HEAVY = 650
 
 # Code Behavior
-COOLDOWN_SECONDS = 3.0   # Cooldown between 2 alerts
+COOLDOWN_SECONDS = 2.0   # Cooldown between 2 alerts
 RECONNECT_DELAY = 5.0    # Cooldown before try another connection with the serveur
-SEND_DELAY = 3.0         # Frenquency of data sending
+SEND_DELAY = 4.0         # Hearthbeat
 
+# NOUVEAU : Intervalle d'exécution de l'IA (en secondes)
+AI_INTERVAL_SECONDS = 0.12 # 0.5 = 2 images par seconde analysées
 
 # --- WebSocket
 class WebSocketAlertSender:
@@ -176,6 +178,10 @@ while program_running:
         "timestamp": datetime.utcnow().isoformat() + "Z"
     })
 
+    # Variables d'état pour la gestion de l'IA
+    last_ai_time = 0.0
+    annotated_frame = None
+
     # Loop for IA processing
     while program_running:
         ret, frame = cap.read()
@@ -184,12 +190,13 @@ while program_running:
             ws_sender.send({
                 "Camera": "Camera_Anpviz_1",
                 "online": False,
-                "message": "video lost",
+                "error": "vido lost",
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             })
             cap.release()
             time.sleep(RECONNECT_DELAY)
             break
+        
         #Ping signal to stay awake (every 2 sec)
         current_time = time.time()
         if (current_time - last_alert_time) > SEND_DELAY:
@@ -202,43 +209,51 @@ while program_running:
             })
             last_alert_time = current_time
             
-        results = model.predict(source=frame, conf=CONFIDENCE_PREDICT, verbose=False)
+        # NOUVELLE LOGIQUE : Exécution de l'IA espacée dans le temps
+        if (current_time - last_ai_time) >= AI_INTERVAL_SECONDS:
+            results = model.predict(source=frame, conf=CONFIDENCE_DETECT, verbose=False)
+            annotated_frame = results[0].plot()
+            last_ai_time = current_time
 
-        for box in results[0].boxes:
-            confidence = float(box.conf[0])
-            class_id = int(box.cls[0])
-            label = model.names[class_id]
-            
-            current_time = time.time()
-            if confidence > CONFIDENCE_DETECT and (current_time - last_alert_time) > COOLDOWN_SECONDS:
-                alerte = {
-                    "Camera": "Camera_Anpviz_1",
-                    "state": label,
-                    "confiance": round(confidence * 100, 2)
-                }
-                print(f"🔥 FIRE ALERTE : {alerte}")
+            for box in results[0].boxes:
+                confidence = float(box.conf[0])
+                class_id = int(box.cls[0])
+                label = model.names[class_id]
                 
-                try:
-                    payload = dict(alerte)
-                    payload["online"] = True
-                    payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                alert_time_check = time.time()
+                
+                if confidence > CONFIDENCE_DETECT and (alert_time_check - last_alert_time) > COOLDOWN_SECONDS:
+                    alerte = {
+                        "Camera": "Camera_Anpviz_1",
+                        "state": label,
+                        "confiance": round(confidence * 100, 2)
+                    }
+                    print(f"🔥 FIRE ALERTE : {alerte}")
                     
-                    if label.lower() == "fire":
-                        payload["flame"] = True
-                        payload["smoke"] = SMOKE_LOW  # Low Smoke
-                    elif label.lower() == "smoke":
-                        payload["flame"] = False
-                        payload["smoke"] = SMOKE_HEAVY  # Heavy smoke
-                    ok = ws_sender.send(payload)
-                    if not ok:
-                        print("⚠️ Send to ws is not working")
-                    else:
-                        last_alert_time = current_time 
-                except Exception as e:
-                    print(f"ERROR: {e}")
+                    try:
+                        payload = dict(alerte)
+                        payload["online"] = True
+                        payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
+                        
+                        if label.lower() == "fire":
+                            payload["flame"] = True
+                            payload["smoke"] = SMOKE_LOW  # Low Smoke
+                        elif label.lower() == "smoke":
+                            payload["flame"] = False
+                            payload["smoke"] = SMOKE_HEAVY  # Heavy smoke
+                        ok = ws_sender.send(payload)
+                        if not ok:
+                            print("⚠️ Send to ws is not working")
+                        else:
+                            last_alert_time = alert_time_check 
+                    except Exception as e:
+                        print(f"ERROR: {e}")
         
-        annotated_frame = results[0].plot()
-        cv2.imshow(WINDOW_NAME, annotated_frame)
+        # Affichage du flux
+        if annotated_frame is not None:
+            cv2.imshow(WINDOW_NAME, annotated_frame)
+        else:
+            cv2.imshow(WINDOW_NAME, frame)
         
         # Gestion de la fermeture propre du programme
         key = cv2.waitKey(1) & 0xFF
