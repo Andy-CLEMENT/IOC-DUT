@@ -1,24 +1,20 @@
-"""
-fire_detect.py
-
-Systeme de detection de feu et fumee par IA (YOLO) sur flux camera RTSP,
-avec envoi d'alertes en temps reel vers un dashboard via WebSocket.
-
-Architecture :
-    Config           - toute la configuration au meme endroit
-    CameraStream     - connexion et lecture du flux camera (GStreamer/RTSP)
-    AlertSender      - envoi asynchrone des messages vers le serveur WebSocket
-    FireDetector     - encapsule le modele YOLO et l'interpretation des resultats
-    FireDetectionApp - orchestre les composants ci-dessus (boucle principale)
-"""
+#!/usr/bin/env python3
+# -----------------------------------------------------------------------
+# fire_detect.py
+#
+# Detection de feu/fumee par IA (YOLO) sur flux camera RTSP.
+# Alertes envoyees en temps reel a un serveur WebSocket.
+#
+# Style : procedural, structures explicites (struct) + fonctions.
+# Chaque fonction module_action(struct, ...) prend sa structure en
+# premier argument, comme un pointeur passe explicitement en C.
+# -----------------------------------------------------------------------
 
 import sys
 import time
 import json
 import queue
-import logging
 import threading
-from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import cv2
@@ -30,369 +26,391 @@ except ImportError:
     websocket = None
 
 
-# ----------------------------------------------------------------------
-# Configuration
-# ----------------------------------------------------------------------
+# ============================ CONSTANTES ==================================
 
-@dataclass(frozen=True)
-class Config:
-    # Connexion camera
-    camera_ip: str = "192.168.0.123"
-    camera_user: str = "admin"
-    camera_password: str = "123456"
-    camera_name: str = "Camera_Anpviz_1"
-    rtsp_port: int = 554
-    rtsp_channel: int = 101
+CAMERA_IP               = "192.168.0.123"
+CAMERA_USER             = "admin"
+CAMERA_PASSWORD         = "123456"
+CAMERA_NAME             = "Camera_Anpviz_1"
+RTSP_PORT               = 554
+RTSP_CHANNEL            = 101
 
-    # WebSocket
-    ws_url: str = "ws://127.0.0.1:8765"  # "ws://192.168.4.1/ws" pour le test reel
-    ws_queue_max: int = 1000
-    ws_reconnect_delay: float = 5.0
+WS_URL                  = "ws://127.0.0.1:8765"   # "ws://192.168.4.1/ws" pour test reel
+WS_QUEUE_MAX            = 1000
+WS_RECONNECT_DELAY_SEC  = 5.0
 
-    # Modele IA
-    model_path: str = "fire-detect-model.engine"
-    confidence_threshold: float = 0.5
-    ai_interval_seconds: float = 0.12  # ~8 images/seconde analysees
+MODEL_PATH              = "fire-detect-model.engine"
+CONFIDENCE_THRESHOLD    = 0.5
+AI_INTERVAL_SEC         = 0.12   # ~8 images/seconde analysees
 
-    # Niveaux de fumee envoyes au dashboard
-    smoke_low: int = 100
-    smoke_medium: int = 150
-    smoke_heavy: int = 650
+SMOKE_LOW               = 100
+SMOKE_MEDIUM            = 150
+SMOKE_HEAVY             = 650
 
-    # Comportement des alertes
-    alert_cooldown_seconds: float = 2.0      # delai minimum entre deux alertes
-    heartbeat_interval_seconds: float = 4.0  # signal "je suis vivant" regulier
+ALERT_COOLDOWN_SEC      = 2.0
+HEARTBEAT_INTERVAL_SEC  = 4.0
 
-    # Affichage
-    window_name: str = "IA Fire Detection System - 4MP"
-    window_width: int = 1280
-    window_height: int = 720
+WINDOW_NAME             = "IA Fire Detection System - 4MP"
+WINDOW_WIDTH            = 1280
+WINDOW_HEIGHT           = 720
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger("fire-detect")
+# ============================ STRUCTURES ===================================
+# Champs uniquement, comme des struct en C. Toute la logique vit dans des
+# fonctions separees qui recoivent la structure en premier argument.
+
+class WsSender:
+    __slots__ = ("url", "reconnect_delay", "msg_queue", "stop_event", "thread")
 
 
-def now_iso() -> str:
-    """Horodatage UTC au format ISO 8601 (equivalent a l'ancien datetime.utcnow())."""
+class Camera:
+    __slots__ = ("cap",)
+
+
+class Detector:
+    __slots__ = ("model",)
+
+
+class AppState:
+    __slots__ = (
+        "running",
+        "last_heartbeat_time",
+        "last_alert_time",
+        "last_ai_time",
+        "annotated_frame",
+    )
+
+
+# ============================ UTILITAIRES ==================================
+
+def now_iso():
+    """Horodatage UTC ISO 8601 (equivalent de l'ancien datetime.utcnow())."""
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-# ----------------------------------------------------------------------
-# WebSocket : envoi des alertes en arriere-plan
-# ----------------------------------------------------------------------
+def log_info(fmt, *args):
+    print("[INFO ] " + (fmt % args if args else fmt))
 
-class AlertSender:
-    """
-    Envoie des messages JSON vers un serveur WebSocket dans un thread dedie.
-    Se reconnecte automatiquement en cas de coupure, sans jamais bloquer
-    l'appelant (send() est non-bloquant).
-    """
 
-    def __init__(self, url: str, queue_max: int, reconnect_delay: float):
-        self._url = url
-        self._reconnect_delay = reconnect_delay
-        self._queue: "queue.Queue[str]" = queue.Queue(maxsize=queue_max)
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+def log_warn(fmt, *args):
+    print("[WARN ] " + (fmt % args if args else fmt))
 
-    def send(self, payload: dict) -> bool:
-        """Ajoute un message a la file d'envoi. Retourne False si websocket est absent ou la file pleine."""
-        if websocket is None:
-            return False
+
+def log_error(fmt, *args):
+    print("[ERROR] " + (fmt % args if args else fmt))
+
+
+# ============================ MODULE WEBSOCKET ==============================
+# ws_sender_* : equivalent d'un fichier .c/.h. Toutes les fonctions prennent
+# une struct WsSender en premier argument.
+
+def ws_sender_create(url, queue_max, reconnect_delay):
+    ws = WsSender()
+    ws.url = url
+    ws.reconnect_delay = reconnect_delay
+    ws.msg_queue = queue.Queue(maxsize=queue_max)
+    ws.stop_event = threading.Event()
+    ws.thread = threading.Thread(target=ws_sender_thread_main, args=(ws,), daemon=True)
+    ws.thread.start()
+    return ws
+
+
+def ws_sender_send(ws, payload):
+    """Empile un message JSON. Non bloquant. Retourne 1 si ok, 0 sinon."""
+    if websocket is None:
+        return 0
+    try:
+        ws.msg_queue.put_nowait(json.dumps(payload))
+        return 1
+    except queue.Full:
+        log_warn("File WebSocket pleine, message perdu")
+        return 0
+
+
+def ws_sender_close(ws, timeout=2.0):
+    ws.stop_event.set()
+    ws.thread.join(timeout)
+
+
+def ws_sender_thread_main(ws):
+    if websocket is None:
+        log_error("Module 'websocket' absent : alertes desactivees")
+        return
+
+    while not ws.stop_event.is_set():
+        conn = None
         try:
-            self._queue.put_nowait(json.dumps(payload))
-            return True
-        except queue.Full:
-            log.warning("File d'attente WebSocket pleine, message perdu")
-            return False
+            conn = websocket.create_connection(ws.url, timeout=8)
+            ws_sender_pump(ws, conn)
+        except Exception as exc:
+            log_warn("Connexion WebSocket echouee (%s), retry dans %.1fs", exc, ws.reconnect_delay)
+            time.sleep(ws.reconnect_delay)
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
-    def close(self, timeout: float = 2.0):
-        self._stop_event.set()
-        self._thread.join(timeout)
 
-    def _run(self):
-        if websocket is None:
-            log.error("Module 'websocket' non installe : les alertes ne seront pas envoyees")
+def ws_sender_pump(ws, conn):
+    """Boucle d'envoi tant que la connexion est valide. Retourne pour forcer un retry."""
+    while not ws.stop_event.is_set():
+        try:
+            msg = ws.msg_queue.get(timeout=0.5)
+        except queue.Empty:
+            continue
+        try:
+            conn.send(msg)
+        except Exception:
+            ws_sender_requeue(ws, msg)
             return
 
-        while not self._stop_event.is_set():
-            try:
-                self._connection_loop()
-            except Exception as exc:
-                log.warning(
-                    "Connexion WebSocket echouee (%s), nouvelle tentative dans %.1fs",
-                    exc, self._reconnect_delay,
-                )
-                time.sleep(self._reconnect_delay)
 
-    def _connection_loop(self):
-        ws = websocket.create_connection(self._url, timeout=8)
-        try:
-            while not self._stop_event.is_set():
-                try:
-                    message = self._queue.get(timeout=0.5)
-                except queue.Empty:
-                    continue
-                try:
-                    ws.send(message)
-                except Exception:
-                    self._requeue(message)
-                    raise  # force une reconnexion
-        finally:
-            ws.close()
-
-    def _requeue(self, message: str):
-        try:
-            self._queue.put_nowait(message)
-        except queue.Full:
-            pass
+def ws_sender_requeue(ws, msg):
+    try:
+        ws.msg_queue.put_nowait(msg)
+    except queue.Full:
+        pass
 
 
-# ----------------------------------------------------------------------
-# Camera : connexion GStreamer/RTSP avec repli H.264 -> H.265
-# ----------------------------------------------------------------------
+# ============================ MODULE CAMERA ==================================
 
-class CameraStream:
-    """Gere la connexion a la camera RTSP via GStreamer, avec repli H.265 si H.264 echoue."""
+def camera_build_pipeline(codec_id):
+    """codec_id = 'h264' ou 'h265'."""
+    if codec_id == "h264":
+        depay = "rtph264depay ! h264parse"
+    else:
+        depay = "rtph265depay ! h265parse"
 
-    def __init__(self, config: Config):
-        self._cfg = config
-        self._cap = None
+    url = "rtsp://%s:%d/Streaming/Channels/%d" % (CAMERA_IP, RTSP_PORT, RTSP_CHANNEL)
 
-    def connect(self) -> bool:
-        """Tente une connexion H.264 puis H.265. Retourne True si succes."""
-        for name, pipeline_fn in (("H.264", self._pipeline_h264), ("H.265", self._pipeline_h265)):
-            log.info("Tentative de connexion camera en %s...", name)
-            cap = cv2.VideoCapture(pipeline_fn(), cv2.CAP_GSTREAMER)
-            if cap.isOpened():
-                self._cap = cap
-                log.info("Connexion camera etablie (%s)", name)
-                return True
-        self._cap = None
-        return False
-
-    def read(self):
-        """Retourne (succes, frame). Ne leve jamais si la camera n'est pas connectee."""
-        if self._cap is None:
-            return False, None
-        return self._cap.read()
-
-    def release(self):
-        if self._cap is not None:
-            self._cap.release()
-            self._cap = None
-
-    def _rtsp_url(self) -> str:
-        c = self._cfg
-        return f"rtsp://{c.camera_ip}:{c.rtsp_port}/Streaming/Channels/{c.rtsp_channel}"
-
-    def _pipeline_h264(self) -> str:
-        return (
-            f"rtspsrc location={self._rtsp_url()} protocols=tcp "
-            f"user-id={self._cfg.camera_user} user-pw={self._cfg.camera_password} latency=200 ! "
-            "rtph264depay ! h264parse ! nvv4l2decoder ! "
-            "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-            "videoconvert ! video/x-raw, format=(string)BGR ! "
-            "appsink drop=true sync=false"
-        )
-
-    def _pipeline_h265(self) -> str:
-        return (
-            f"rtspsrc location={self._rtsp_url()} protocols=tcp "
-            f"user-id={self._cfg.camera_user} user-pw={self._cfg.camera_password} latency=200 ! "
-            "rtph265depay ! h265parse ! nvv4l2decoder ! "
-            "nvvidconv ! video/x-raw, format=(string)BGRx ! "
-            "videoconvert ! video/x-raw, format=(string)BGR ! "
-            "appsink drop=true sync=false"
-        )
+    return (
+        "rtspsrc location=%s protocols=tcp user-id=%s user-pw=%s latency=200 ! "
+        "%s ! nvv4l2decoder ! "
+        "nvvidconv ! video/x-raw, format=(string)BGRx ! "
+        "videoconvert ! video/x-raw, format=(string)BGR ! "
+        "appsink drop=true sync=false"
+    ) % (url, CAMERA_USER, CAMERA_PASSWORD, depay)
 
 
-# ----------------------------------------------------------------------
-# Detection IA : chargement du modele et interpretation des resultats
-# ----------------------------------------------------------------------
-
-class FireDetector:
-    """Encapsule le modele YOLO et la construction des payloads d'alerte."""
-
-    def __init__(self, config: Config):
-        self._cfg = config
-        log.info("Chargement du modele IA (%s) sur GPU...", config.model_path)
-        try:
-            self.model = YOLO(config.model_path)
-        except Exception as exc:
-            log.error("Echec du chargement du modele IA : %s", exc)
-            sys.exit(1)
-        log.info("Modele IA pret.")
-
-    def analyze(self, frame):
-        """
-        Lance l'inference sur une frame.
-        Retourne (frame_annotee, detections) ou detections est une liste
-        de tuples (label, confiance).
-        """
-        results = self.model.predict(
-            source=frame, conf=self._cfg.confidence_threshold, verbose=False
-        )[0]
-        annotated = results.plot()
-
-        detections = [
-            (self.model.names[int(box.cls[0])], float(box.conf[0]))
-            for box in results.boxes
-        ]
-        return annotated, detections
-
-    def build_alert_payload(self, camera_name: str, label: str, confidence: float) -> dict:
-        payload = {
-            "Camera": camera_name,
-            "state": label,
-            "confiance": round(confidence * 100, 2),
-            "online": True,
-            "timestamp": now_iso(),
-        }
-        if label.lower() == "fire":
-            payload["flame"] = True
-            payload["smoke"] = self._cfg.smoke_low
-        elif label.lower() == "smoke":
-            payload["flame"] = False
-            payload["smoke"] = self._cfg.smoke_heavy
-        return payload
+def camera_connect(cam):
+    """Essaie H.264 puis H.265. Retourne 1 si succes, 0 sinon."""
+    codecs = (("H.264", "h264"), ("H.265", "h265"))
+    for codec_name, codec_id in codecs:
+        log_info("Tentative de connexion camera en %s...", codec_name)
+        pipeline = camera_build_pipeline(codec_id)
+        cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
+        if cap.isOpened():
+            cam.cap = cap
+            log_info("Connexion camera etablie (%s)", codec_name)
+            return 1
+    cam.cap = None
+    return 0
 
 
-# ----------------------------------------------------------------------
-# Application principale
-# ----------------------------------------------------------------------
+def camera_read(cam):
+    """Retourne (ok, frame) avec ok = 0/1."""
+    if cam.cap is None:
+        return 0, None
+    ok, frame = cam.cap.read()
+    return (1 if ok else 0), frame
 
-class FireDetectionApp:
-    def __init__(self, config: Config):
-        self.cfg = config
-        self.detector = FireDetector(config)
-        self.alert_sender = AlertSender(config.ws_url, config.ws_queue_max, config.ws_reconnect_delay)
-        self.camera = CameraStream(config)
 
-        self._last_heartbeat = 0.0
-        self._last_alert = 0.0
-        self._last_ai_run = 0.0
-        self._running = True
+def camera_release(cam):
+    if cam.cap is not None:
+        cam.cap.release()
+        cam.cap = None
 
-        cv2.namedWindow(config.window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(config.window_name, config.window_width, config.window_height)
 
-    def run(self):
-        log.info("Appuyez sur 'q' pour quitter le programme.")
-        try:
-            while self._running:
-                if not self.camera.connect():
-                    self._notify_offline("Video Stream can't be read")
-                    time.sleep(self.cfg.ws_reconnect_delay)
-                    continue
-                self._notify_online("Video Stream enabled")
-                self._stream_loop()
-        finally:
-            self._shutdown()
+# ============================ MODULE DETECTEUR IA ============================
 
-    def _stream_loop(self):
-        """Boucle de lecture/analyse/affichage tant que le flux camera est valide."""
-        annotated_frame = None
+def detector_create(model_path):
+    det = Detector()
+    log_info("Chargement du modele IA (%s) sur GPU...", model_path)
+    try:
+        det.model = YOLO(model_path)
+    except Exception as exc:
+        log_error("Echec du chargement du modele IA : %s", exc)
+        sys.exit(1)
+    log_info("Modele IA pret.")
+    return det
 
-        while self._running:
-            ok, frame = self.camera.read()
-            if not ok:
-                log.warning("Flux video perdu.")
-                self._notify_offline("video lost")
-                self.camera.release()
-                time.sleep(self.cfg.ws_reconnect_delay)
-                return
 
-            self._send_heartbeat_if_due()
+def detector_analyze(det, frame):
+    """Retourne (frame_annotee, detections). detections = liste de (label, confiance)."""
+    result = det.model.predict(source=frame, conf=CONFIDENCE_THRESHOLD, verbose=False)[0]
+    annotated = result.plot()
 
-            if self._ai_due():
-                annotated_frame, detections = self.detector.analyze(frame)
-                self._last_ai_run = time.time()
-                self._handle_detections(detections)
+    detections = []
+    for box in result.boxes:
+        class_id = int(box.cls[0])
+        confidence = float(box.conf[0])
+        label = det.model.names[class_id]
+        detections.append((label, confidence))
 
-            cv2.imshow(self.cfg.window_name, annotated_frame if annotated_frame is not None else frame)
+    return annotated, detections
 
-            if self._should_quit():
-                self._running = False
-                return
 
-    def _ai_due(self) -> bool:
-        return (time.time() - self._last_ai_run) >= self.cfg.ai_interval_seconds
+def detector_build_alert_payload(camera_name, label, confidence):
+    payload = {
+        "Camera": camera_name,
+        "state": label,
+        "confiance": round(confidence * 100, 2),
+        "online": True,
+        "timestamp": now_iso(),
+    }
+    label_lc = label.lower()
+    if label_lc == "fire":
+        payload["flame"] = True
+        payload["smoke"] = SMOKE_LOW
+    elif label_lc == "smoke":
+        payload["flame"] = False
+        payload["smoke"] = SMOKE_HEAVY
+    return payload
 
-    def _send_heartbeat_if_due(self):
-        """Signal 'online' regulier, independant du cooldown des alertes."""
+
+# ============================ ALERTES / HEARTBEAT ============================
+
+def notify_online(ws, message):
+    ws_sender_send(ws, {
+        "Camera": CAMERA_NAME,
+        "online": True,
+        "message": message,
+        "timestamp": now_iso(),
+    })
+
+
+def notify_offline(ws, error):
+    ws_sender_send(ws, {
+        "Camera": CAMERA_NAME,
+        "online": False,
+        "error": error,
+        "timestamp": now_iso(),
+    })
+
+
+def send_heartbeat_if_due(ws, state):
+    now = time.time()
+    if (now - state.last_heartbeat_time) <= HEARTBEAT_INTERVAL_SEC:
+        return
+    ws_sender_send(ws, {
+        "Camera": CAMERA_NAME,
+        "flame": False,
+        "smoke": 100,
+        "online": True,
+        "timestamp": now_iso(),
+    })
+    state.last_heartbeat_time = now
+
+
+def handle_detections(ws, state, detections):
+    """Envoie une alerte si une detection franchit le seuil, hors cooldown."""
+    now = time.time()
+    if (now - state.last_alert_time) <= ALERT_COOLDOWN_SEC:
+        return
+
+    for label, confidence in detections:
+        if confidence <= CONFIDENCE_THRESHOLD:
+            continue
+
+        payload = detector_build_alert_payload(CAMERA_NAME, label, confidence)
+        log_info("ALERTE : %s", payload)
+
+        if ws_sender_send(ws, payload):
+            state.last_alert_time = now
+        else:
+            log_warn("Echec de l'envoi de l'alerte au serveur WebSocket.")
+        break  # une alerte par cycle suffit
+
+
+# ============================ AFFICHAGE / ENTREES =============================
+
+def should_quit():
+    """Retourne 1 si l'utilisateur veut quitter (touche 'q' ou fenetre fermee)."""
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
+        log_info("Touche 'q' pressee, arret du programme.")
+        return 1
+    try:
+        if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
+            log_info("Fenetre fermee par l'utilisateur.")
+            return 1
+    except cv2.error:
+        return 1
+    return 0
+
+
+# ============================ BOUCLE PRINCIPALE ================================
+
+def stream_loop(ws, cam, det, state):
+    """
+    Boucle de lecture/analyse/affichage tant que le flux camera est valide.
+    Retourne quand le flux est perdu ou que l'utilisateur quitte.
+    """
+    state.annotated_frame = None
+
+    while state.running:
+        ok, frame = camera_read(cam)
+        if not ok:
+            log_warn("Flux video perdu.")
+            notify_offline(ws, "video lost")
+            camera_release(cam)
+            time.sleep(WS_RECONNECT_DELAY_SEC)
+            return
+
+        send_heartbeat_if_due(ws, state)
+
         now = time.time()
-        if (now - self._last_heartbeat) > self.cfg.heartbeat_interval_seconds:
-            self.alert_sender.send({
-                "Camera": self.cfg.camera_name,
-                "flame": False,
-                "smoke": 100,
-                "online": True,
-                "timestamp": now_iso(),
-            })
-            self._last_heartbeat = now
+        if (now - state.last_ai_time) >= AI_INTERVAL_SEC:
+            annotated, detections = detector_analyze(det, frame)
+            state.annotated_frame = annotated
+            state.last_ai_time = now
+            handle_detections(ws, state, detections)
 
-    def _handle_detections(self, detections):
-        """Envoie une alerte si une detection franchit le seuil, en respectant le cooldown."""
-        now = time.time()
-        if (now - self._last_alert) <= self.cfg.alert_cooldown_seconds:
-            return  # encore en cooldown, on ignore ce cycle
+        if state.annotated_frame is not None:
+            cv2.imshow(WINDOW_NAME, state.annotated_frame)
+        else:
+            cv2.imshow(WINDOW_NAME, frame)
 
-        for label, confidence in detections:
-            if confidence <= self.cfg.confidence_threshold:
-                continue
+        if should_quit():
+            state.running = 0
+            return
 
-            payload = self.detector.build_alert_payload(self.cfg.camera_name, label, confidence)
-            log.info("ALERTE : %s", payload)
 
-            if self.alert_sender.send(payload):
-                self._last_alert = now
-            else:
-                log.warning("Echec de l'envoi de l'alerte au serveur WebSocket.")
-            break  # une alerte par cycle suffit
+def main():
+    det = detector_create(MODEL_PATH)
+    ws = ws_sender_create(WS_URL, WS_QUEUE_MAX, WS_RECONNECT_DELAY_SEC)
 
-    def _should_quit(self) -> bool:
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            log.info("Touche 'q' pressee, arret du programme.")
-            return True
-        try:
-            if cv2.getWindowProperty(self.cfg.window_name, cv2.WND_PROP_AUTOSIZE) == -1:
-                log.info("Fenetre fermee par l'utilisateur.")
-                return True
-        except cv2.error:
-            return True
-        return False
+    cam = Camera()
+    cam.cap = None
 
-    def _notify_online(self, message: str):
-        self.alert_sender.send({
-            "Camera": self.cfg.camera_name,
-            "online": True,
-            "message": message,
-            "timestamp": now_iso(),
-        })
+    state = AppState()
+    state.running = 1
+    state.last_heartbeat_time = 0.0
+    state.last_alert_time = 0.0
+    state.last_ai_time = 0.0
+    state.annotated_frame = None
 
-    def _notify_offline(self, error: str):
-        self.alert_sender.send({
-            "Camera": self.cfg.camera_name,
-            "online": False,
-            "error": error,
-            "timestamp": now_iso(),
-        })
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINDOW_NAME, WINDOW_WIDTH, WINDOW_HEIGHT)
 
-    def _shutdown(self):
-        self.camera.release()
-        cv2.destroyAllWindows()
-        self.alert_sender.close()
-        log.info("Programme arrete.")
+    log_info("Appuyez sur 'q' pour quitter le programme.")
+
+    while state.running:
+        if not camera_connect(cam):
+            notify_offline(ws, "Video Stream can't be read")
+            time.sleep(WS_RECONNECT_DELAY_SEC)
+            continue
+
+        notify_online(ws, "Video Stream enabled")
+        stream_loop(ws, cam, det, state)
+
+    camera_release(cam)
+    cv2.destroyAllWindows()
+    ws_sender_close(ws)
+    log_info("Programme arrete.")
 
 
 if __name__ == "__main__":
-    app = FireDetectionApp(Config())
-    app.run()
+    main()
