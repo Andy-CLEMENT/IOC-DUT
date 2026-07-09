@@ -26,19 +26,19 @@ WINDOW_NAME = "IA Fire Detection System - 4MP"
 
 # AI Settings
 MODEL_PATH = "fire-detect-model.engine"
-CONFIDENCE_PREDICT = 0.4   # seuil utilisé pour l'inférence (affichage des boites)
-CONFIDENCE_DETECT = 0.5    # seuil, plus strict, utilisé pour déclencher une alerte
+CONFIDENCE_PREDICT = 0.4   # To display boxes
+CONFIDENCE_DETECT = 0.5    # To send an Alert
 SMOKE_LOW = 100
 SMOKE_MEDIUM = 150
 SMOKE_HEAVY = 650
 
 # Code Behavior
-COOLDOWN_SECONDS = 2.0   # Cooldown entre 2 alertes
-RECONNECT_DELAY = 5.0    # Cooldown avant une nouvelle tentative de connexion au serveur
-SEND_DELAY = 4.0         # Intervalle du heartbeat
+COOLDOWN_SECONDS = 2.0   # Delay between 2 alerts
+RECONNECT_DELAY = 5.0    # Cooldown before another attempt to connect to the server
+SEND_DELAY = 4.0         # Period of heartbeat
 
-# Intervalle d'exécution de l'IA (en secondes)
-AI_INTERVAL_SECONDS = 0.12  # ~8 images/seconde analysées
+# Interval of IA computing (en secondes)
+AI_INTERVAL_SECONDS = 0.12  # ~8 pictures/sec analysed
 
 
 # --- WebSocket
@@ -132,12 +132,10 @@ def connect_camera():
     return None
 
 
-# --- Construction des paquets JSON --------------------------------------
-# Toute la mise en forme des messages envoyés au dashboard est centralisée
-# ici, la boucle principale ne fait qu'appeler ces fonctions.
+# --- Building JSON tram --------------------------------------
 
 def build_status_payload(online: bool, message: str = None, error: str = None) -> dict:
-    """Paquet de statut caméra (connexion établie / perdue)."""
+    """Camera status packet (connection established / lost)."""
     payload = {
         "Camera": CAMERA_NAME,
         "online": online,
@@ -151,7 +149,7 @@ def build_status_payload(online: bool, message: str = None, error: str = None) -
 
 
 def build_heartbeat_payload() -> dict:
-    """Paquet 'ping' envoyé régulièrement pour signaler que le système est actif."""
+    """A “ping” packet is sent periodically to indicate that the system is active."""
     return {
         "Camera": CAMERA_NAME,
         "flame": False,
@@ -162,7 +160,7 @@ def build_heartbeat_payload() -> dict:
 
 
 def build_alert_payload(label: str, confidence: float) -> dict:
-    """Paquet d'alerte envoyé lors d'une détection feu/fumée."""
+    """Alert packet sent when fire or smoke is detected."""
     payload = {
         "Camera": CAMERA_NAME,
         "state": label,
@@ -180,7 +178,7 @@ def build_alert_payload(label: str, confidence: float) -> dict:
     return payload
 
 
-# --- Initialisation du système -------------------------------------------
+# --- System Initialization -------------------------------------------
 print(f"Loading ({MODEL_PATH}) on GPU...")
 try:
     model = YOLO(MODEL_PATH)
@@ -199,9 +197,9 @@ print("press 'q' to exit the program")
 
 # --- Boucle principale ----------------------------------------------------
 program_running = True
-last_heartbeat_time = 0.0   # dernier "ping" envoyé (indépendant des alertes)
-last_alert_time = 0.0       # dernière alerte feu/fumée envoyée (gère le cooldown)
-last_ai_time = 0.0          # dernière exécution de l'inférence IA
+last_heartbeat_time = 0.0   # Last “ping” sent (separate from alerts)
+last_alert_time = 0.0       # Last fire/smoke alert sent (manages the cooldown)
+last_ai_time = 0.0          # last AI inference run
 
 while program_running:
 
@@ -228,23 +226,23 @@ while program_running:
 
         now = time.time()
 
-        # Heartbeat régulier : totalement indépendant du cooldown des alertes
+        # Regular heartbeat: completely independent of the alert cooldown
         if (now - last_heartbeat_time) > SEND_DELAY:
             ws_sender.send(build_heartbeat_payload())
             last_heartbeat_time = now
 
-        # Inférence IA, cadencée par AI_INTERVAL_SECONDS
+        # AI inference, timed by AI_INTERVAL_SECONDS
         if (now - last_ai_time) >= AI_INTERVAL_SECONDS:
             results = model.predict(source=frame, conf=CONFIDENCE_PREDICT, verbose=False)[0]
             annotated_frame = results.plot()
             last_ai_time = now
 
-            # On ne cherche une alerte que si le cooldown est écoulé
+            # We only check for an alert if the cooldown has expired
             if (now - last_alert_time) > COOLDOWN_SECONDS:
                 for box in results.boxes:
                     confidence = float(box.conf[0])
                     if confidence <= CONFIDENCE_DETECT:
-                        continue  # sous le seuil d'alerte, ignoré (mais affiché)
+                        continue  # below the alert threshold, ignored (but displayed)
 
                     label = model.names[int(box.cls[0])]
                     payload = build_alert_payload(label, confidence)
@@ -254,12 +252,12 @@ while program_running:
                         last_alert_time = now
                     else:
                         print("⚠️ Send to ws is not working")
-                    break  # une seule alerte par cycle : respecte le cooldown
+                    break  # Only one alert per cycle: respects the cooldown
 
-        # Affichage du flux
+        # Feed View
         cv2.imshow(WINDOW_NAME, annotated_frame if annotated_frame is not None else frame)
 
-        # Gestion de la fermeture propre du programme
+        # Handling the Proper Termination of the Program
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             print("'q' pressed, program is stopping.")
@@ -275,7 +273,7 @@ while program_running:
             program_running = False
             break
 
-# --- Nettoyage final avant de quitter ---
+# --- Final cleaning before leaving ---
 if 'cap' in locals() and cap is not None:
     cap.release()
 cv2.destroyAllWindows()
