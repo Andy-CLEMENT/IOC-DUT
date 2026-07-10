@@ -26,19 +26,19 @@ WINDOW_NAME = "IA Fire Detection System - 4MP"
 
 # AI Settings
 MODEL_PATH = "fire-detect-model.engine"
-CONFIDENCE_PREDICT = 0.4   # To display boxes
-CONFIDENCE_DETECT = 0.5    # To send an Alert
+CONFIDENCE_PREDICT = 0.4   # threshold used for inference (box plotting)
+CONFIDENCE_DETECT = 0.5    # a stricter threshold used to trigger an alert
 SMOKE_LOW = 100
 SMOKE_MEDIUM = 150
 SMOKE_HEAVY = 650
 
 # Code Behavior
-COOLDOWN_SECONDS = 2.0   # Delay between 2 alerts
+COOLDOWN_SECONDS = 2.0   # Cooldown between two alerts
 RECONNECT_DELAY = 5.0    # Cooldown before another attempt to connect to the server
-SEND_DELAY = 4.0         # Period of heartbeat
+SEND_DELAY = 4.0         # Heartbeat interval
 
-# Interval of IA computing (en secondes)
-AI_INTERVAL_SECONDS = 0.12  # ~8 pictures/sec analysed
+# AI execution interval (in seconds)
+AI_INTERVAL_SECONDS = 0.12  # ~8 frames per second analyzed
 
 
 # --- WebSocket
@@ -132,7 +132,9 @@ def connect_camera():
     return None
 
 
-# --- Building JSON tram --------------------------------------
+# --- Building JSON Packages --------------------------------------
+# All formatting of messages sent to the dashboard is centralized
+# here; the main loop simply calls these functions.
 
 def build_status_payload(online: bool, message: str = None, error: str = None) -> dict:
     """Camera status packet (connection established / lost)."""
@@ -148,19 +150,22 @@ def build_status_payload(online: bool, message: str = None, error: str = None) -
     return payload
 
 
-def build_heartbeat_payload() -> dict:
-    """A “ping” packet is sent periodically to indicate that the system is active."""
+def build_heartbeat_payload(current_flame: bool, current_smoke: int) -> dict:
+    """
+    Signal "Keep-Alive"
+    IMPORTANT : return the current state of the device
+    """
     return {
         "Camera": CAMERA_NAME,
-        "flame": False,
-        "smoke": 100,
+        "flame": current_flame,
+        "smoke": current_smoke,
         "online": True,
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
 
 def build_alert_payload(label: str, confidence: float) -> dict:
-    """Alert packet sent when fire or smoke is detected."""
+    """Paquet d'alerte envoyé lors d'une détection feu/fumée."""
     payload = {
         "Camera": CAMERA_NAME,
         "state": label,
@@ -195,11 +200,14 @@ cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 print("press 'q' to exit the program")
 
 
-# --- Boucle principale ----------------------------------------------------
+# --- Main Loop ----------------------------------------------------
 program_running = True
-last_heartbeat_time = 0.0   # Last “ping” sent (separate from alerts)
-last_alert_time = 0.0       # Last fire/smoke alert sent (manages the cooldown)
-last_ai_time = 0.0          # last AI inference run
+last_heartbeat_time = 0.0
+last_alert_time = 0.0
+last_ai_time = 0.0
+
+current_flame = False
+current_smoke = 100
 
 while program_running:
 
@@ -226,38 +234,57 @@ while program_running:
 
         now = time.time()
 
-        # Regular heartbeat: completely independent of the alert cooldown
-        if (now - last_heartbeat_time) > SEND_DELAY:
-            ws_sender.send(build_heartbeat_payload())
-            last_heartbeat_time = now
-
-        # AI inference, timed by AI_INTERVAL_SECONDS
+        # Inférence IA, cadencée par AI_INTERVAL_SECONDS
         if (now - last_ai_time) >= AI_INTERVAL_SECONDS:
             results = model.predict(source=frame, conf=CONFIDENCE_PREDICT, verbose=False)[0]
             annotated_frame = results.plot()
             last_ai_time = now
 
-            # We only check for an alert if the cooldown has expired
-            if (now - last_alert_time) > COOLDOWN_SECONDS:
-                for box in results.boxes:
-                    confidence = float(box.conf[0])
-                    if confidence <= CONFIDENCE_DETECT:
-                        continue  # below the alert threshold, ignored (but displayed)
+            # Cherche la détection la plus significative de la frame
+            # (au-dessus du seuil d'alerte). Le feu prime sur la fumée si
+            # les deux sont détectés en même temps.
+            best_label, best_confidence = None, 0.0
+            for box in results.boxes:
+                confidence = float(box.conf[0])
+                if confidence <= CONFIDENCE_DETECT:
+                    continue  
 
-                    label = model.names[int(box.cls[0])]
-                    payload = build_alert_payload(label, confidence)
-                    print(f"🔥 FIRE ALERTE : {payload}")
+                label = model.names[int(box.cls[0])]
+                if best_label is None or label.lower() == "fire":
+                    best_label, best_confidence = label, confidence
+                    if label.lower() == "fire":
+                        break
 
-                    if ws_sender.send(payload):
-                        last_alert_time = now
-                    else:
-                        print("⚠️ Send to ws is not working")
-                    break  # Only one alert per cycle: respects the cooldown
+            # update current state
+            if best_label is not None:
+                label_lower = best_label.lower()
+                current_flame = (label_lower == "fire")
+                if label_lower == "fire":
+                    current_smoke = SMOKE_LOW
+                elif label_lower == "smoke":
+                    current_smoke = SMOKE_HEAVY
+            else:
+                current_flame = False
+                current_smoke = 100
 
-        # Feed View
+            if best_label is not None and (now - last_alert_time) > COOLDOWN_SECONDS:
+                payload = build_alert_payload(best_label, best_confidence)
+                print(f"🔥 FIRE ALERTE : {payload}")
+
+                if ws_sender.send(payload):
+                    last_alert_time = now
+                else:
+                    print("⚠️ Send to ws is not working")
+
+        # hearthbeat
+        if (now - last_heartbeat_time) > SEND_DELAY:
+            ws_sender.send(build_heartbeat_payload(current_flame, current_smoke))
+            last_heartbeat_time = now
+
+        # dislay video stream
         cv2.imshow(WINDOW_NAME, annotated_frame if annotated_frame is not None else frame)
 
-        # Handling the Proper Termination of the Program
+        # closure management
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             print("'q' pressed, program is stopping.")
@@ -273,7 +300,7 @@ while program_running:
             program_running = False
             break
 
-# --- Final cleaning before leaving ---
+# --- Final cleaning ---
 if 'cap' in locals() and cap is not None:
     cap.release()
 cv2.destroyAllWindows()
