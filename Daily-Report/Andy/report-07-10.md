@@ -1,3 +1,5 @@
+ pul
+
 # Report 10/07/2026
 
 We work on the presentation due to Monday, 13th of July. So we have created a powerpoint to explain our work and what we made since the beginning of the internship. We have also worked on the new AI for fire detection. Cause of the new model Yolov11m, the Jetson faces an overcurrent issue. To avoid this issue, we decided to run the AI not on all the frames of the camera but only on a few. With this method we have solved this problem.
