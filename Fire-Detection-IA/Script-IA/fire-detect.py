@@ -12,11 +12,12 @@ try:
 except ImportError:
     websocket = None
 
-#Global configuration
+# Global configuration
 
 # Video Stream settings
 WS_URL = "ws://127.0.0.1:8765"  #  Put "ws://192.168.4.1/ws" for the real test
 CAMERA_IP = "192.168.0.123"
+CAMERA_NAME = "Camera_Anpviz_1"
 USER = "admin"
 PASSWORD = "123456"
 GSTREAMER_PORT = 554
@@ -25,19 +26,20 @@ WINDOW_NAME = "IA Fire Detection System - 4MP"
 
 # AI Settings
 MODEL_PATH = "fire-detect-model.engine"
-CONFIDENCE_PREDICT = 0.4
-CONFIDENCE_DETECT = 0.5
+CONFIDENCE_PREDICT = 0.4   # threshold used for inference (box plotting)
+CONFIDENCE_DETECT = 0.5    # a stricter threshold used to trigger an alert
 SMOKE_LOW = 100
 SMOKE_MEDIUM = 150
 SMOKE_HEAVY = 650
 
 # Code Behavior
-COOLDOWN_SECONDS = 2.0   # Cooldown between 2 alerts
-RECONNECT_DELAY = 5.0    # Cooldown before try another connection with the serveur
-SEND_DELAY = 4.0         # Hearthbeat
+COOLDOWN_SECONDS = 2.0   # Cooldown between two alerts
+RECONNECT_DELAY = 5.0    # Cooldown before another attempt to connect to the server
+SEND_DELAY = 4.0         # Heartbeat interval
 
-# NOUVEAU : Intervalle d'exécution de l'IA (en secondes)
-AI_INTERVAL_SECONDS = 0.12 # 0.5 = 2 images par seconde analysées
+# AI execution interval (in seconds)
+AI_INTERVAL_SECONDS = 0.12  # ~8 frames per second analyzed
+
 
 # --- WebSocket
 class WebSocketAlertSender:
@@ -121,147 +123,171 @@ def connect_camera():
     cap = cv2.VideoCapture(gstreamer_pipeline_h264(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
     if cap.isOpened():
         return cap
-        
+
     print("H.264 do not work, try H.265...")
     cap = cv2.VideoCapture(gstreamer_pipeline_h265(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
     if cap.isOpened():
         return cap
-        
+
     return None
 
-# --- System initialisation ---
-print(f"Loading ({MODEL_PATH}) on  GPU...")
-model = None
 
+# --- Building JSON Packages --------------------------------------
+# All formatting of messages sent to the dashboard is centralized
+# here; the main loop simply calls these functions.
+
+def build_status_payload(online: bool, message: str = None, error: str = None) -> dict:
+    """Camera status packet (connection established / lost)."""
+    payload = {
+        "Camera": CAMERA_NAME,
+        "online": online,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    if message is not None:
+        payload["message"] = message
+    if error is not None:
+        payload["error"] = error
+    return payload
+
+
+def build_heartbeat_payload(current_flame: bool, current_smoke: int) -> dict:
+    """
+    Signal "Keep-Alive"
+    IMPORTANT : return the current state of the device
+    """
+    return {
+        "Camera": CAMERA_NAME,
+        "flame": current_flame,
+        "smoke": current_smoke,
+        "online": True,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+
+
+def build_alert_payload(label: str, confidence: float) -> dict:
+    """Paquet d'alerte envoyé lors d'une détection feu/fumée."""
+    payload = {
+        "Camera": CAMERA_NAME,
+        "state": label,
+        "confiance": round(confidence * 100, 2),
+        "online": True,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    label_lower = label.lower()
+    if label_lower == "fire":
+        payload["flame"] = True
+        payload["smoke"] = SMOKE_LOW
+    elif label_lower == "smoke":
+        payload["flame"] = False
+        payload["smoke"] = SMOKE_HEAVY
+    return payload
+
+
+# --- System Initialization -------------------------------------------
+print(f"Loading ({MODEL_PATH}) on GPU...")
 try:
     model = YOLO(MODEL_PATH)
 except Exception as e:
     print(f"Load of IA meet an issue: {e}")
     sys.exit(1)
+print("IA ready !")
 
-# Check the model
-if model is not None:
-    print("IA ready !")
-
-# WebSocket run
 ws_sender = WebSocketAlertSender(WS_URL)
-last_alert_time = 0.0  
-program_running = True
 
 cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 
 print("press 'q' to exit the program")
 
-# Loop of work
+
+# --- Main Loop ----------------------------------------------------
+program_running = True
+last_heartbeat_time = 0.0
+last_alert_time = 0.0
+last_ai_time = 0.0
+
+current_flame = False
+current_smoke = 100
+
 while program_running:
-    
-    # Attempt to connect the camera
+
     cap = connect_camera()
-    
     if cap is None or not cap.isOpened():
         print("Error : connection to the camera impossible, new attempt in few second...")
-        ws_sender.send({
-            "Camera": "Camera_Anpviz_1",
-            "online": False,
-            "error": "Video Stream can't be read",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        })
+        ws_sender.send(build_status_payload(online=False, error="Video Stream can't be read"))
         time.sleep(RECONNECT_DELAY)
-        continue  # new tentative
+        continue
 
     print("✅ Connexion enable")
-    ws_sender.send({
-        "Camera": "Camera_Anpviz_1",
-        "online": True,
-        "message": "Video Stream enabled",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    })
+    ws_sender.send(build_status_payload(online=True, message="Video Stream enabled"))
 
-    # Variables d'état pour la gestion de l'IA
-    last_ai_time = 0.0
     annotated_frame = None
 
-    # Loop for IA processing
     while program_running:
         ret, frame = cap.read()
         if not ret:
             print("⚠️ video stream lost !")
-            ws_sender.send({
-                "Camera": "Camera_Anpviz_1",
-                "online": False,
-                "error": "vido lost",
-                "timestamp": datetime.utcnow().isoformat() + "Z"
-            })
+            ws_sender.send(build_status_payload(online=False, error="video lost"))
             cap.release()
             time.sleep(RECONNECT_DELAY)
             break
-        
-        #Ping signal to stay awake (every 2 sec)
-        current_time = time.time()
-        if (current_time - last_alert_time) > SEND_DELAY:
-            ws_sender.send({
-                "Camera": "Camera_Anpviz_1",
-                "flame": False,
-                "smoke": 100,
-                "online": True,
-                "timestamp": datetime.utcnow().isoformat() + "Z"
-            })
-            last_alert_time = current_time
-            
-        # NOUVELLE LOGIQUE : Exécution de l'IA espacée dans le temps
-        if (current_time - last_ai_time) >= AI_INTERVAL_SECONDS:
-            results = model.predict(source=frame, conf=CONFIDENCE_DETECT, verbose=False)
-            annotated_frame = results[0].plot()
-            last_ai_time = current_time
 
-            for box in results[0].boxes:
+        now = time.time()
+
+        # AI inference, timed by AI_INTERVAL_SECONDS
+        if (now - last_ai_time) >= AI_INTERVAL_SECONDS:
+            results = model.predict(source=frame, conf=CONFIDENCE_PREDICT, verbose=False)[0]
+            annotated_frame = results.plot()
+            last_ai_time = now
+
+            best_label, best_confidence = None, 0.0
+            for box in results.boxes:
                 confidence = float(box.conf[0])
-                class_id = int(box.cls[0])
-                label = model.names[class_id]
-                
-                alert_time_check = time.time()
-                
-                if confidence > CONFIDENCE_DETECT and (alert_time_check - last_alert_time) > COOLDOWN_SECONDS:
-                    alerte = {
-                        "Camera": "Camera_Anpviz_1",
-                        "state": label,
-                        "confiance": round(confidence * 100, 2)
-                    }
-                    print(f"🔥 FIRE ALERTE : {alerte}")
-                    
-                    try:
-                        payload = dict(alerte)
-                        payload["online"] = True
-                        payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
-                        
-                        if label.lower() == "fire":
-                            payload["flame"] = True
-                            payload["smoke"] = SMOKE_LOW  # Low Smoke
-                        elif label.lower() == "smoke":
-                            payload["flame"] = False
-                            payload["smoke"] = SMOKE_HEAVY  # Heavy smoke
-                        ok = ws_sender.send(payload)
-                        if not ok:
-                            print("⚠️ Send to ws is not working")
-                        else:
-                            last_alert_time = alert_time_check 
-                    except Exception as e:
-                        print(f"ERROR: {e}")
-        
-        # Affichage du flux
-        if annotated_frame is not None:
-            cv2.imshow(WINDOW_NAME, annotated_frame)
-        else:
-            cv2.imshow(WINDOW_NAME, frame)
-        
-        # Gestion de la fermeture propre du programme
+                if confidence <= CONFIDENCE_DETECT:
+                    continue  
+
+                label = model.names[int(box.cls[0])]
+                if best_label is None or label.lower() == "fire":
+                    best_label, best_confidence = label, confidence
+                    if label.lower() == "fire":
+                        break
+
+            # update current state
+            if best_label is not None:
+                label_lower = best_label.lower()
+                current_flame = (label_lower == "fire")
+                if label_lower == "fire":
+                    current_smoke = SMOKE_LOW
+                elif label_lower == "smoke":
+                    current_smoke = SMOKE_HEAVY
+            else:
+                current_flame = False
+                current_smoke = 100
+
+            if best_label is not None and (now - last_alert_time) > COOLDOWN_SECONDS:
+                payload = build_alert_payload(best_label, best_confidence)
+                print(f"🔥 FIRE ALERTE : {payload}")
+
+                if ws_sender.send(payload):
+                    last_alert_time = now
+                else:
+                    print("⚠️ Send to ws is not working")
+
+        # hearthbeat
+        if (now - last_heartbeat_time) > SEND_DELAY:
+            ws_sender.send(build_heartbeat_payload(current_flame, current_smoke))
+            last_heartbeat_time = now
+
+        # dislay video stream
+        cv2.imshow(WINDOW_NAME, annotated_frame if annotated_frame is not None else frame)
+
+        # closure management
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             print("'q' pressed, program is stopping.")
             program_running = False
             break
-            
+
         try:
             if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
                 print("Windows close with (X).")
@@ -271,7 +297,7 @@ while program_running:
             program_running = False
             break
 
-# --- Nettoyage final avant de quitter ---
+# --- Final cleaning ---
 if 'cap' in locals() and cap is not None:
     cap.release()
 cv2.destroyAllWindows()

@@ -82,9 +82,10 @@ Also, to avoid typing `cd ~/Documents/Fire-Detect && ./run.sh` every time, we cr
 So, to run the project, you just have to type in a terminal:
 
 ```running
-fire-detect
+run_fire_detect
 ```
 
+You can change the alias by edit the `~/.bash_aliases`
 Do not forget to connect the camera to the Ethernet port of the Jetson. If the camera is not working, verify that the Ethernet port is configured as follows:
 
 ```Ethernet

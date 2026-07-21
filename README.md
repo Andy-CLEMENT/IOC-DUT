@@ -30,7 +30,8 @@ Daily-Report/
     ├── report-06-17.md
     ├── report-06-23.md
     ├── report-06-31.md
-    └── report-07-10.md
+    ├── report-07-10.md
+    └── report-07-21.md
 ```
 
 ---
@@ -126,12 +127,12 @@ Vietnamese-Code/
 
 ## 5. Root files
 
-| File | Description |
-|---|---|
-| `README.md` | General overview of the repository |
+| File                 | Description                                                                     |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `README.md`        | General overview of the repository                                              |
 | `Running-Tutorial` | Getting-started tutorial: Jetson connection, headless VNC, running the pipeline |
-| `fire-detect.py` | Copy of the detection script (repo root) |
-| `.gitignore` | Files/folders excluded from Git tracking |
+| `fire-detect.py`   | Copy of the detection script (repo root)                                        |
+| `.gitignore`       | Files/folders excluded from Git tracking                                        |
 
 ---
 
@@ -139,6 +140,6 @@ Vietnamese-Code/
 
 1. Connect to the Jetson via SSH (see `Running-Tutorial`)
 2. Activate headless VNC if graphical access is needed
-3. Launch detection on the Jetson with `fire-detect` (→ `Fire-Detection-IA/Script-IA/run.sh`)
+3. Launch detection on the Jetson with `run_fire_detect` (→ `Fire-Detection-IA/Script-IA/run.sh`)
 4. Launch the dashboard on the PC side (`Vietnamese-Code/New-Fire-Alarm/fire-dashboard`) with `npm run dev`
 5. Connect the dashboard to the Jetson via `ws://192.168.55.1:8765`
