@@ -1,29 +1,27 @@
 #!/bin/bash
 
-#faut faire chmod +x run.sh avant de executer
-
 cd "$(dirname "$0")"
 
-echo "--- Démarrage du système ---"
+echo "--- System Startup ---"
 
-echo "Configuration du Wi-Fi..."
+echo "Wi-Fi Setup..."
 sudo iw dev wlan0 set power_save off
 
-echo "Libération du port 8765..."
+echo "Port 8765 released..."
 sudo fuser -k 8765/tcp > /dev/null 2>&1
 
-echo "Lancement du serveur relais en arrière-plan..."
+echo "Launching the relay server in the background..."
 python3 serveur_relais.py > log_serveur.txt 2>&1 &
 SERVEUR_PID=$!
 
 sleep 2
 
-echo "Lancement de l'IA (fire-detect.py)..."
-echo "Appuyez sur 'q' dans la fenêtre vidéo pour quitter."
+echo "Launching the AI (fire-detect.py)..."
+echo "Press 'q' in the video window to exit"
 python3 fire-detect.py
 
-echo "Arrêt en cours..."
+echo "Stopping now..."
 kill $SERVEUR_PID > /dev/null 2>&1
 sudo fuser -k 8765/tcp > /dev/null 2>&1
 
-echo "Système arrêté proprement."
+echo "The system shut down properly"
