@@ -1,28 +1,26 @@
-# Utilisation de l'image de base Ultralytics optimisée pour processeurs ARM64 (Jetson)
+# Use the Ultralytics base image optimized for ARM64 processors (Jetson)
 FROM ultralytics/ultralytics:latest-arm64
 
-# Définition du répertoire de travail dans le conteneur
+# Set the working directory inside the container
 WORKDIR /app
 
-# Installation des dépendances système nécessaires pour les commandes de run.sh
+# Install system dependencies required for run.sh commands
 RUN apt-get update && apt-get install -y \
     psmisc \
     sudo \
     libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
-# Installation des bibliothèques Python supplémentaires (pour serveur_relais.py)
 RUN pip install websockets
 
-# Copie des scripts d'inférence
 COPY ./Fire-Detection-IA/Script-IA /app/Script-IA
 
-# Copie du modèle IA final (ajuste le nom si ton Python pointe vers un autre fichier)
+# Copy the final AI model
 COPY ./Fire-Detection-IA/model_final/best.pt /app/model_final/best.pt
 COPY ./Fire-Detection-IA/yolo11m.pt /app/yolo11m.pt
 
-# Attribution des droits d'exécution au script
+# Grant execution permissions to the script
 RUN chmod +x /app/Script-IA/run.sh
 
-# Commande par défaut au lancement du conteneur
+# Default command when starting the container
 CMD ["/app/Script-IA/run.sh"]
