@@ -21,7 +21,7 @@ COPY ./Fire-Detection-IA/model_final/best.pt /app/model_final/best.pt
 COPY ./Fire-Detection-IA/yolo11m.pt /app/yolo11m.pt
 
 # Grant execution permissions to the script
-RUN chmod +x /app/Script-IA/run.sh
+RUN dos2unix /app/Script-IA/run.sh && chmod +x /app/Script-IA/run.sh
 
 # Default command when starting the container
 CMD ["/app/Script-IA/run.sh"]
