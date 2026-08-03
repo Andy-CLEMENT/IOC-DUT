@@ -140,30 +140,33 @@ Vietnamese-Code/
 ---
 
 
-## 6. System Deployment (Docker)
+## 6. System Deployment (Docker Compose)
 
 To ensure high reproducibility and avoid dependency conflicts on the NVIDIA Jetson Orin Nano, the inference system is packaged within a Docker container. 
 
 ### Prerequisites on the Jetson
-The NVIDIA Container Runtime and Docker must be installed (included by default in JetPack).
-
-### Build the Docker Image
-Navigate to the root of this repository (`IOC-DUT`) and run the following command to build the image:
-
-```bash
-sudo docker build -t fire-detection-ioc .
-```
+The **NVIDIA Container Runtime**, **Docker**, and **Docker Compose** must be installed (they are included by default in NVIDIA JetPack).
 
 ### Run the System
-Because the system requires access to the physical camera (/dev/video0), hardware acceleration (GPU), and window rendering (X11 for OpenCV), run the container using the following commands:
+We use Docker Compose to easily manage the complex hardware bindings (GPU acceleration, physical camera access, and X11 window rendering).
+
+Navigate to the root of this repository (`IOC-DUT`) on the Jetson. 
+First, authorize local connections to the X server (this is required to display the video window and only needs to be run once per reboot):
 
 ```bash
 xhost +local:root
-
-sudo docker run -it --rm --net=host --runtime nvidia --device /dev/video0 -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix fire-detection-ioc
 ```
 
-This command will automatically execute run.sh, which starts both the WebSocket relay server and the real-time AI fire detection script. Press q on the video window to stop the system safely.
+Then, build the image and start the container with a single command:
+
+```bash
+sudo docker compose up --build
+```
+
+This command will automatically execute run.sh, which starts both the WebSocket relay server and the real-time AI fire detection script.
+
+### Stop the System
+To safely stop the AI, the WebSocket server, and gracefully shut down the Docker container, simply press Ctrl+C in your terminal.
 
 
 ## 7. Quick workflow summary

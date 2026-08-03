@@ -1,0 +1,13 @@
+services:
+  fire-detection:
+    build: .
+    image: fire-detection-ioc
+    container_name: fire-detection-container
+    network_mode: "host"
+    runtime: nvidia
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    stdin_open: true
+    tty: true
