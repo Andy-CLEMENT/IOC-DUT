@@ -10,4 +10,4 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
     stdin_open: true
-    tty: true
+    tty: true   

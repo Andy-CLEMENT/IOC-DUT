@@ -148,7 +148,7 @@ To ensure high reproducibility and avoid dependency conflicts on the NVIDIA Jets
 The **NVIDIA Container Runtime**, **Docker**, and **Docker Compose** must be installed (they are included by default in NVIDIA JetPack).
 
 ### Run the System
-We use Docker Compose to easily manage the complex hardware bindings (GPU acceleration, physical camera access, and X11 window rendering).
+We use Docker Compose to easily manage the hardware bindings (GPU acceleration, network access for the IP camera, and X11 window rendering).
 
 Navigate to the root of this repository (`IOC-DUT`) on the Jetson. 
 First, authorize local connections to the X server (this is required to display the video window and only needs to be run once per reboot):
@@ -163,7 +163,7 @@ Then, build the image and start the container with a single command:
 sudo docker compose up --build
 ```
 
-This command will automatically execute run.sh, which starts both the WebSocket relay server and the real-time AI fire detection script.
+This command will automatically execute run.sh, which starts both the WebSocket relay server and the real-time AI fire detection script (fetching the RTSP stream from the IP camera).
 
 ### Stop the System
 To safely stop the AI, the WebSocket server, and gracefully shut down the Docker container, simply press Ctrl+C in your terminal.

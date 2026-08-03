@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     psmisc \
     sudo \
     libgl1 \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install websockets
