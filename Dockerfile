@@ -4,15 +4,19 @@ FROM ultralytics/ultralytics:latest-arm64
 # Set the working directory inside the container
 WORKDIR /app
 
-# Install system dependencies required for run.sh commands
+# Install system dependencies required for GUI and run.sh commands
 RUN apt-get update && apt-get install -y \
     psmisc \
     sudo \
     libgl1 \
     dos2unix \
+    libgtk2.0-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install websockets
+# Replace headless OpenCV with standard OpenCV for window rendering
+RUN pip uninstall -y opencv-python-headless opencv-python && \
+    pip install opencv-python websockets
 
 COPY ./Fire-Detection-IA/Script-IA /app/Script-IA
 
@@ -20,7 +24,7 @@ COPY ./Fire-Detection-IA/Script-IA /app/Script-IA
 COPY ./Fire-Detection-IA/model_final/best.pt /app/model_final/best.pt
 COPY ./Fire-Detection-IA/yolo11m.pt /app/yolo11m.pt
 
-# Grant execution permissions to the script
+# Fix Windows line endings and grant execution permissions to the script
 RUN dos2unix /app/Script-IA/run.sh && chmod +x /app/Script-IA/run.sh
 
 # Default command when starting the container
