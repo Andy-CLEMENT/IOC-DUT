@@ -194,8 +194,9 @@ print("IA ready !")
 
 ws_sender = WebSocketAlertSender(WS_URL)
 
-cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
-cv2.resizeWindow(WINDOW_NAME, 1280, 720)
+# Commented part to run from Docker
+#cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+#cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 
 print("press 'q' to exit the program")
 
@@ -278,29 +279,30 @@ while program_running:
             ws_sender.send(build_heartbeat_payload(current_flame, current_smoke))
             last_heartbeat_time = now
 
-        # dislay video stream
-        cv2.imshow(WINDOW_NAME, annotated_frame if annotated_frame is not None else frame)
+        # dislay video stream (Only without Docker)
+        #cv2.imshow(WINDOW_NAME, annotated_frame if annotated_frame is not None else frame)
 
-        # closure management
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            print("'q' pressed, program is stopping.")
-            program_running = False
-            break
-
-        try:
-            if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
-                print("Windows close with (X).")
-                program_running = False
-                break
-        except cv2.error:
-            program_running = False
-            break
-
+        # closure management (Only whitout Docker)
+        #key = cv2.waitKey(1) & 0xFF
+        #if key == ord('q'):
+        #    print("'q' pressed, program is stopping.")
+        #    program_running = False
+        #    break
+#
+        #try:
+        #    if cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_AUTOSIZE) == -1:
+        #        print("Windows close with (X).")
+        #        program_running = False
+        #        break
+        #except cv2.error:
+        #    program_running = False
+        #    break
+#
 # --- Final cleaning ---
 if 'cap' in locals() and cap is not None:
     cap.release()
-cv2.destroyAllWindows()
+    #Only for non Docker Use
+#cv2.destroyAllWindows()
 try:
     ws_sender.close()
 except Exception:
