@@ -13,6 +13,8 @@ Internship planning: [Google Sheets](https://docs.google.com/spreadsheets/d/1JbV
 3. [Fire-Detection-IA](#3-fire-detection-ia) — fire/smoke detection AI model (the part Sadewa works on)
 4. [Vietnamese-Code](#4-vietnamese-code) — legacy work from the Vietnamese team
 5. [Root files](#5-root-files)
+6. [System Deployment (Docker)](#6-system-deployment-docker)
+7. [Quick Workflow Summary](#7-quick-workflow-summary)
 
 ---
 
@@ -130,16 +132,44 @@ Vietnamese-Code/
 | File                 | Description                                                                     |
 | -------------------- | ------------------------------------------------------------------------------- |
 | `README.md`        | General overview of the repository                                              |
+| `Dockerfile`        | Container configuration for deploying the AI inference system                                              |
 | `Running-Tutorial` | Getting-started tutorial: Jetson connection, headless VNC, running the pipeline |
 | `fire-detect.py`   | Copy of the detection script (repo root)                                        |
 | `.gitignore`       | Files/folders excluded from Git tracking                                        |
 
 ---
 
-## Quick workflow summary
+
+## 6. System Deployment (Docker)
+
+To ensure high reproducibility and avoid dependency conflicts on the NVIDIA Jetson Orin Nano, the inference system is packaged within a Docker container. 
+
+### Prerequisites on the Jetson
+The NVIDIA Container Runtime and Docker must be installed (included by default in JetPack).
+
+### Build the Docker Image
+Navigate to the root of this repository (`IOC-DUT`) and run the following command to build the image:
+
+```bash
+sudo docker build -t fire-detection-ioc .
+```
+
+### Run the System
+Because the system requires access to the physical camera (/dev/video0), hardware acceleration (GPU), and window rendering (X11 for OpenCV), run the container using the following commands:
+
+```bash
+xhost +local:root
+
+sudo docker run -it --rm --net=host --runtime nvidia --device /dev/video0 -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix fire-detection-ioc
+```
+
+This command will automatically execute run.sh, which starts both the WebSocket relay server and the real-time AI fire detection script. Press q on the video window to stop the system safely.
+
+
+## 7. Quick workflow summary
 
 1. Connect to the Jetson via SSH (see `Running-Tutorial`)
 2. Activate headless VNC if graphical access is needed
-3. Launch detection on the Jetson with `run_fire_detect` (→ `Fire-Detection-IA/Script-IA/run.sh`)
+3. Start the AI on the Jetson using the Docker container (see Section 6 above). This handles both the inference and the WebSocket server.
 4. Launch the dashboard on the PC side (`Vietnamese-Code/New-Fire-Alarm/fire-dashboard`) with `npm run dev`
 5. Connect the dashboard to the Jetson via `ws://192.168.55.1:8765`
