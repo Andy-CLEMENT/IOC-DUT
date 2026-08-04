@@ -1,31 +1,27 @@
-# Use the Ultralytics base image optimized for ARM64 processors (Jetson)
-FROM ultralytics/ultralytics:latest-arm64
+FROM ultralytics/ultralytics:latest-jetson-jetpack6
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Install system dependencies required for GUI and run.sh commands
+# Dependencies
 RUN apt-get update && apt-get install -y \
     psmisc \
     sudo \
-    libgl1 \
     dos2unix \
     libgtk2.0-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Replace headless OpenCV with standard OpenCV for window rendering
-RUN pip uninstall -y opencv-python-headless opencv-python && \
-    pip install opencv-python websockets
+# For web communication
+RUN pip install --no-cache-dir websocket-client websockets
+
+# Headless running
+RUN pip uninstall -y opencv-python opencv-python-headless || true
 
 COPY ./Fire-Detection-IA/Script-IA /app/Script-IA
 
-# Copy the final AI model
-COPY ./Fire-Detection-IA/model_final/best.pt /app/model_final/best.pt
-COPY ./Fire-Detection-IA/yolo11m.pt /app/yolo11m.pt
+# Use the IA compile file
+COPY ./Fire-Detection-IA/Script-IA/fire-detect-model.engine /app/Script-IA/fire-detect-model.engine
 
-# Fix Windows line endings and grant execution permissions to the script
 RUN dos2unix /app/Script-IA/run.sh && chmod +x /app/Script-IA/run.sh
 
-# Default command when starting the container
 CMD ["/bin/bash", "/app/Script-IA/run.sh"]

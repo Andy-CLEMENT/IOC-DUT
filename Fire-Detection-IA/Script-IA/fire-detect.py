@@ -15,7 +15,7 @@ except ImportError:
 # Global configuration
 
 # Video Stream settings
-WS_URL = "ws://127.0.0.1:8765"  #  Put "ws://192.168.4.1/ws" for the real test
+WS_URL = "ws://127.0.0.1:8765"
 CAMERA_IP = "192.168.0.123"
 CAMERA_NAME = "Camera_Anpviz_1"
 USER = "admin"
@@ -119,13 +119,13 @@ def gstreamer_pipeline_h265(user, password, ip, port=GSTREAMER_PORT, channel=GST
     )
 
 def connect_camera():
-    print("Attempt connection with H.264...")
-    cap = cv2.VideoCapture(gstreamer_pipeline_h264(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
+    print("Attempt connection with H.265...")
+    cap = cv2.VideoCapture(gstreamer_pipeline_h265(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
     if cap.isOpened():
         return cap
 
-    print("H.264 do not work, try H.265...")
-    cap = cv2.VideoCapture(gstreamer_pipeline_h265(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
+    print("H.264 do not work, try H.264...")
+    cap = cv2.VideoCapture(gstreamer_pipeline_h264(USER, PASSWORD, CAMERA_IP), cv2.CAP_GSTREAMER)
     if cap.isOpened():
         return cap
 
@@ -133,8 +133,7 @@ def connect_camera():
 
 
 # --- Building JSON Packages --------------------------------------
-# All formatting of messages sent to the dashboard is centralized
-# here; the main loop simply calls these functions.
+# All formatting of messages sent to the dashboard is centralized in main loop
 
 def build_status_payload(online: bool, message: str = None, error: str = None) -> dict:
     """Camera status packet (connection established / lost)."""
@@ -183,7 +182,7 @@ def build_alert_payload(label: str, confidence: float) -> dict:
     return payload
 
 
-# --- System Initialization -------------------------------------------
+# --- System Initialization --------------
 print(f"Loading ({MODEL_PATH}) on GPU...")
 try:
     model = YOLO(MODEL_PATH)
@@ -198,10 +197,10 @@ ws_sender = WebSocketAlertSender(WS_URL)
 #cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
 #cv2.resizeWindow(WINDOW_NAME, 1280, 720)
 
-print("press 'q' to exit the program")
+#print("press 'q' to exit the program")
 
 
-# --- Main Loop ----------------------------------------------------
+# --- Main Loop ----------------
 program_running = True
 last_heartbeat_time = 0.0
 last_alert_time = 0.0
@@ -219,7 +218,7 @@ while program_running:
         time.sleep(RECONNECT_DELAY)
         continue
 
-    print("✅ Connexion enable")
+    print("? Connexion enable")
     ws_sender.send(build_status_payload(online=True, message="Video Stream enabled"))
 
     annotated_frame = None
@@ -227,7 +226,7 @@ while program_running:
     while program_running:
         ret, frame = cap.read()
         if not ret:
-            print("⚠️ video stream lost !")
+            print("?? video stream lost !")
             ws_sender.send(build_status_payload(online=False, error="video lost"))
             cap.release()
             time.sleep(RECONNECT_DELAY)
@@ -267,12 +266,12 @@ while program_running:
 
             if best_label is not None and (now - last_alert_time) > COOLDOWN_SECONDS:
                 payload = build_alert_payload(best_label, best_confidence)
-                print(f"🔥 FIRE ALERTE : {payload}")
+                print(f"?? FIRE ALERTE : {payload}")
 
                 if ws_sender.send(payload):
                     last_alert_time = now
                 else:
-                    print("⚠️ Send to ws is not working")
+                    print("?? Send to ws is not working")
 
         # hearthbeat
         if (now - last_heartbeat_time) > SEND_DELAY:

@@ -7,7 +7,16 @@ services:
     runtime: nvidia
     environment:
       - DISPLAY=${DISPLAY}
+      #- OPENCV_VIDEOIO_DEBUG=1
+      #- OPENCV_LOG_LEVEL=DEBUG
+      #- GST_DEBUG=3
+      - LD_LIBRARY_PATH=/host-libs/aarch64-linux-gnu:/host-libs/lib
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - /usr/lib/python3/dist-packages/cv2.cpython-310-aarch64-linux-gnu.so:/usr/local/lib/python3.10/dist-packages/cv2.cpython-310-aarch64-linux-gnu.so:ro
+      #  - /usr/lib/aarch64-linux-gnu : libopencv_*.so, GStreamer, FFmpeg, TBB...
+      #  - /usr/lib                   : libgdal
+      - /usr/lib/aarch64-linux-gnu:/host-libs/aarch64-linux-gnu:ro
+      - /usr/lib:/host-libs/lib:ro
     stdin_open: true
-    tty: true   
+    tty: true

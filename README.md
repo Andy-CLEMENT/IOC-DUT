@@ -33,7 +33,8 @@ Daily-Report/
     ├── report-06-23.md
     ├── report-06-31.md
     ├── report-07-10.md
-    └── report-07-21.md
+    ├── report-07-21.md
+    └── report-08-03.md
 ```
 
 ---
@@ -65,11 +66,11 @@ Fire-Detection-IA/
 │
 ├── Data-Sheet/                # hardware datasheets (IP camera, Jetson Orin Nano)
 │
-├── Script-IA/                 # Python scripts running on the Jetson
-│   ├── fire-detect.py         # main detection pipeline (GStreamer/RTSP → YOLO → WebSocket)
-│   ├── serveur_relais.py      # relays data to the dashboard
-│   ├── serveur_test.py        # server test script
-│   └── run.sh                 # launches fire-detect.py and serveur_relais.py together (alias `fire-detect`)
+├── Script-IA/                      # Python scripts running on the Jetson
+│   ├── fire-detect-model.engine    # IA model compile for the jetson
+│   ├── fire-detect.py              # main detection pipeline (GStreamer/RTSP → YOLO → WebSocket)
+│   ├── serveur_relais.py           # relays data to the dashboard
+│   └── run.sh                      # launches fire-detect.py and serveur_relais.py together (alias `fire-detect`)
 │
 ├── training_model/            # training scripts for the different model versions
 │   ├── trainV1.py … trainV4.py
@@ -133,43 +134,14 @@ Vietnamese-Code/
 | -------------------- | ------------------------------------------------------------------------------- |
 | `README.md`        | General overview of the repository                                              |
 | `Dockerfile`        | Container configuration for deploying the AI inference system                                              |
-| `Running-Tutorial` | Getting-started tutorial: Jetson connection, headless VNC, running the pipeline |
-| `fire-detect.py`   | Copy of the detection script (repo root)                                        |
+| `Running-Tutorial` | Getting-started tutorial: Jetson connection, headless VNC, Docker lunch         |
 | `.gitignore`       | Files/folders excluded from Git tracking                                        |
+| `docker-compose.yml`| Files for docker                                                               |
+| `Dockerfile`       | Files for docker                                                                |
 
 ---
 
-
-## 6. System Deployment (Docker Compose)
-
-To ensure high reproducibility and avoid dependency conflicts on the NVIDIA Jetson Orin Nano, the inference system is packaged within a Docker container. 
-
-### Prerequisites on the Jetson
-The **NVIDIA Container Runtime**, **Docker**, and **Docker Compose** must be installed (they are included by default in NVIDIA JetPack).
-
-### Run the System
-We use Docker Compose to easily manage the hardware bindings (GPU acceleration, network access for the IP camera, and X11 window rendering).
-
-Navigate to the root of this repository (`IOC-DUT`) on the Jetson. 
-First, authorize local connections to the X server (this is required to display the video window and only needs to be run once per reboot):
-
-```bash
-xhost +local:root
-```
-
-Then, build the image and start the container with a single command:
-
-```bash
-sudo docker compose up --build
-```
-
-This command will automatically execute run.sh, which starts both the WebSocket relay server and the real-time AI fire detection script (fetching the RTSP stream from the IP camera).
-
-### Stop the System
-To safely stop the AI, the WebSocket server, and gracefully shut down the Docker container, simply press Ctrl+C in your terminal.
-
-
-## 7. Quick workflow summary
+## 6. Quick workflow summary
 
 1. Connect to the Jetson via SSH (see `Running-Tutorial`)
 2. Activate headless VNC if graphical access is needed

@@ -1,6 +1,6 @@
-# Report 31/06/2026
+# Report 30/06/2026
 
-We are currently working on a way to imporve our IA and his perfs. We build a brand new data setr for the training. We resused the old dataset with indoort fire and smoke and then, we add many pictures of empty room and neon lights to avoid error detection and upgrade the accurency of the IA.
-As said before, we use Yolo11 Medium as IA-model. A model very performative in Computer Vision.
+We are currently working on ways to improve our AI and its performance. We built a brand new dataset for training. We reused the old dataset with indoor fire and smoke, then added many pictures of empty rooms and neon lights to avoid false detections and improve the accuracy of the AI.
+As mentioned before, we use YOLO11 Medium as our AI model, a very performant model in computer vision.
 
-After that, the goal is to test it in real condition with real fire.
+After that, the goal is to test it in real conditions with a real fire.

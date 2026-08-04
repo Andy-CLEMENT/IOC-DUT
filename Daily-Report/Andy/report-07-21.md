@@ -1,6 +1,6 @@
 # Report 21/07/2026
 
-We are cleaning the repo to prepare the transfert to the new team in charge of the project. I wrote a full summary for the github and also a full tutoriel of how to run the project and how to configure the environement on the computer.
-Also we are planning a real test with real fire with the vietnamise team.
+We are cleaning up the repo to prepare the transfer to the new team in charge of the project. I wrote a full summary for GitHub, as well as a complete tutorial on how to run the project and configure the environment on the computer.
+We are also planning a real fire test with the Vietnamese team.
 
-The real fire was completed and it was a full success, the camera can detect the fire.
+The real fire test was completed and was a full success: the camera successfully detected the fire.
