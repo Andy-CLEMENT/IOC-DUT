@@ -32,7 +32,7 @@ The `package.json` itself is identical on both OS — nothing to change in the c
 ## Setup — Linux / Jetson
 
 ```bash
-cd Vietnamese-Code/New-Fire-Alarm/fire-dashboard
+cd ./IOC-DUT/Vietnamese-Code/New-Fire-Alarm/fire-dashboard
 chmod +x setup-linux.sh
 ./setup-linux.sh
 ```
@@ -43,19 +43,12 @@ If you get `Permission denied` even after `chmod +x`, run it with bash directly 
 bash setup-linux.sh
 ```
 
-> To avoid re-running `chmod` after every `git pull`, the executable bit should be committed to Git once:
-> ```bash
-> git update-index --chmod=+x setup-linux.sh
-> git commit -m "Make setup-linux.sh executable"
-> git push
-> ```
-
 ---
 
 ## Setup — Windows (PowerShell)
 
 ```powershell
-cd Vietnamese-Code\New-Fire-Alarm\fire-dashboard
+cd .\IOC-DUT\Vietnamese-Code\New-Fire-Alarm\fire-dashboard
 .\setup-windows.ps1
 ```
 

@@ -10,7 +10,7 @@ Even with the right base image, the camera still refused to connect inside the c
 
 Once the camera and inference were working, we also fixed a few smaller things: `cv2.imshow` doesn't work in the container (headless OpenCV), so we made the display window optional via a `SHOW_WINDOW` environment variable; the relay server's WebSocket URL was pointing to the wrong host; and we added the missing `websocket-client`/`websockets` Python packages to the Dockerfile (two different libraries, easy to confuse).
 
-We wrote a short launch tutorial (`TUTORIEL_LANCEMENT_DOCKER.md`) covering the startup procedure and a troubleshooting section listing every issue above, for teammates who don't know the project's Docker setup yet.
+We wrote a short launch tutorial (`Running-Tutorial.md`) covering the startup procedure and a troubleshooting section listing every issue above, for teammates who don't know the project's Docker setup yet.
 
 ```configuration
 Launch (every session, after a reboot/logout):

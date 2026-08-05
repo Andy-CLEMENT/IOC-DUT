@@ -144,21 +144,39 @@ IP mask : 255.255.255.0
 
 ## 5. Launching the dashboard (on the PC side)
 
-The React dashboard used to visualize alerts in real time is launched from the PC (currently Windows only, as the command does not work on Linux).
+The React dashboard used to visualize alerts in real time can be launched from either Windows or Linux (Jetson included). Since a few dependencies (`rolldown`, `@tailwindcss/oxide`, `lightningcss`) use OS-specific native binaries, npm must be run **directly on the machine you're launching from** — never copy `node_modules` between Windows and Linux.
 
 Navigate to the project folder:
 
 ```path
-/home/andy/repo/IOC-DUT/Vietnamese-Code/New-Fire-Alarm/fire-dashboard
+./IOC-DUT/Vietnamese-Code/New-Fire-Alarm/fire-dashboard
 ```
 
-Then, in a Windows terminal:
+### On Windows (PowerShell)
+
+```powershell
+.\setup-windows.ps1
+```
+
+> If PowerShell blocks the script with a security/execution-policy error, run once:
+> ```powershell
+> Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+> ```
+> then relaunch `.\setup-windows.ps1`.
+
+### On Linux / Jetson
+
+Requires **Node.js 18+** (check with `node -v`; on Jetson the default `apt` package is often too old and causes a `SyntaxError` on launch — install a recent version with [nvm](https://github.com/nvm-sh/nvm) if needed: `nvm install --lts`).
 
 ```bash
-# Only needed on first launch
-npm install
+chmod +x setup-linux.sh   # only needed once
+./setup-linux.sh
+```
 
-# Launch the dashboard
+### Manual method (equivalent, either OS)
+
+```bash
+npm install    # only needed on first launch, or after a fresh clone/pull
 npm run dev
 ```
 
@@ -176,5 +194,5 @@ ws://192.168.55.1:8765
 2. Activate headless VNC using the EDID file + `x11vnc`
 3. Connect with TightVNC to access the graphical desktop
 4. Launch detection with the `sudo docker compose up --build` or `run_fire_detect` command (`.sh` script) depending of yout needs
-5. Launch the dashboard on the PC side with `npm run dev`
+5. Launch the dashboard on the PC side with `npm run dev` or `.\setup-windows.ps1` or `./setup-linux.sh` depending of the OS
 6. Connect the dashboard to the Jetson via `ws://192.168.55.1:8765`
