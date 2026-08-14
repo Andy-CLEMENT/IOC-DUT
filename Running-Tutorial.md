@@ -197,7 +197,7 @@ ws://192.168.55.1:8765
 2. Activate headless VNC using the EDID file + `x11vnc`
 
 (Always do)
-1. Connect with TightVNC to access the graphical desktop
+1. Connect with TightVNC to access the graphical desktop with `IP : 192.168.55.1::5900` and `PWD : 987654321`
 2. Launch detection with the `sudo docker compose up --build` or `run_fire_detect` command (`.sh` script) depending of yout needs
 3. Launch the dashboard on the PC side with `npm run dev` or `.\setup-windows.ps1` or `./setup-linux.sh` depending of the OS
 4. Connect the dashboard to the Jetson via `ws://192.168.55.1:8765`
