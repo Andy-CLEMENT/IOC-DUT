@@ -159,9 +159,11 @@ Navigate to the project folder:
 ```
 
 > If PowerShell blocks the script with a security/execution-policy error, run once:
+>
 > ```powershell
 > Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 > ```
+>
 > then relaunch `.\setup-windows.ps1`.
 
 ### On Linux / Jetson
@@ -190,8 +192,10 @@ ws://192.168.55.1:8765
 
 ## 6. Full workflow summary
 
+(If needed)
 1. Connect the Jetson via USB → SSH connection (`192.168.55.1`)
 2. Activate headless VNC using the EDID file + `x11vnc`
+(Always do)
 3. Connect with TightVNC to access the graphical desktop
 4. Launch detection with the `sudo docker compose up --build` or `run_fire_detect` command (`.sh` script) depending of yout needs
 5. Launch the dashboard on the PC side with `npm run dev` or `.\setup-windows.ps1` or `./setup-linux.sh` depending of the OS

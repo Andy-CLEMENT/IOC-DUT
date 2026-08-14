@@ -141,10 +141,10 @@ Vietnamese-Code/
 
 ---
 
-## 6. Quick workflow summary
+## 6. Quick Start
 
-1. Connect to the Jetson via SSH (see `Running-Tutorial`)
-2. Activate headless VNC if graphical access is needed
-3. Start the AI on the Jetson using the Docker container (see Section 6 above). This handles both the inference and the WebSocket server.
-4. Launch the dashboard on the PC side (`Vietnamese-Code/New-Fire-Alarm/fire-dashboard`) with `npm run dev`
+1. Connect to the Jetson via TightVNC to interact with graphic desktop (see `Running-Tutorial`). WARNING : Use a DATA USB cable to connect the Jetson (USB-C) to a USB port of your computer.
+2. Connect to the Jetson with `IP : 192.168.55.1::5900` and `PWD : 987654321`
+3. Go to the IOC-DUT directory in the Jetson (Currently is `~/repo/IOC-DUT`) Start the AI on the Jetson using the Docker container with `sudo docker compose up --build`.
+4. Launch the dashboard on the PC or Jetson side (`IOC-DUT/Vietnamese-Code/New-Fire-Alarm/fire-dashboard`) with `setup-windows.ps1` or `setup-linux.sh` depending of your device.
 5. Connect the dashboard to the Jetson via `ws://192.168.55.1:8765`
