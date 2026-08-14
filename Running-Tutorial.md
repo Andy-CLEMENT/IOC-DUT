@@ -40,18 +40,9 @@ ssh fire-alarm-ia@192.168.55.1
 
 The official NVIDIA method assumes a physical monitor is connected to the Jetson to activate the VNC server. In our case, however, no monitor is permanently available (the HDMI-DisplayPort adapter is shared between several groups). VNC therefore needs to be activated **without a wired display connection ("headless")**.
 
-**WARNING**: This EDID file is already set up. It is documented here in case you ever need to rework this part.
+**WARNING**: This EDID file is already set up. It is documented here in case you ever need to rework this part. **Try first the section 3.3** and if you meet some issue, try section 3.1 and 3.2
 
-### 3.1 Connecting with TightVNC from the PC (No issue meeted)
-
-1. Open TightVNC Viewer on your PC.
-2. Enter the Jetson's IP address: `192.168.55.1`
-3. Enter the password set on the server side: `987654321`
-4. The Jetson's graphical desktop is then displayed on your screen, without an HDMI/DisplayPort cable.
-
-If you need some configuration, please follow the next step.
-
-### 3.2 Using an EDID file
+### 3.1 Using an EDID file
 
 To simulate the presence of a monitor, an EDID file matching a virtual monitor is used:
 
@@ -66,7 +57,7 @@ The full procedure (retrieving and installing the EDID file, configuring the gra
 
 Follow the tutorial step by step.
 
-### 3.3 Starting the VNC server on the Jetson
+### 3.2 Starting the VNC server on the Jetson
 
 Once the EDID file is in place, start the `x11vnc` server on the Jetson (over SSH):
 
@@ -77,6 +68,15 @@ x11vnc -usepw -forever -display :0
 - `-usepw`: requires a password on connection
 - `-forever`: keeps the server running after the first client disconnects
 - `-display :0`: targets the main display simulated by the EDID
+
+### 3.3 Connecting with TightVNC from the PC (If no issue meeted)
+
+1. Open TightVNC Viewer on your PC.
+2. Enter the Jetson's IP address: `192.168.55.1`
+3. Enter the password set on the server side: `987654321`
+4. The Jetson's graphical desktop is then displayed on your screen, without an HDMI/DisplayPort cable.
+
+If you need some configuration, please follow the step 3.1 and 3.2.
 
 ---
 
